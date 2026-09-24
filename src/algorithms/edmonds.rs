@@ -1,7 +1,7 @@
 //! Edmonds' Blossom Algorithm for Maximum Cardinality and Minimum Weight Perfect Matching
 //!
 //! Based on Gerards (1995) "Matching" chapter in Network Models,
-//! and the C++ implementation from Minimum-Cost-Perfect-Matching.
+//! and the classic blossom contraction technique for general graphs.
 
 use crate::algorithms::{MatchingMetadata, MatchingResult};
 use crate::graph::{Edge, Graph};
@@ -12,13 +12,14 @@ const ODD: i32 = 1;
 const UNLABELED: i32 = 0;
 const EPS: f64 = 1e-9;
 
+#[inline]
 fn greater(a: f64, b: f64) -> bool {
     a - b > EPS
 }
 
-/// Edmonds' Blossom Algorithm implementation
+/// Edmonds' Blossom Algorithm implementation for general matching.
 pub struct EdmondsAlgorithm {
-    // Graph reference
+    // Graph representation
     n: usize,
     m: usize,
     edges: Vec<Edge>,
@@ -31,21 +32,21 @@ pub struct EdmondsAlgorithm {
     outer: Vec<usize>,        // outermost blossom containing vertex
     deep: Vec<Vec<usize>>,    // all original vertices inside blossom
     shallow: Vec<Vec<usize>>, // immediate children of blossom
-    tip: Vec<usize>,          // tip of blossom
+    tip: Vec<usize>,          // tip (base) of blossom
     active: Vec<bool>,        // whether blossom is active
 
-    // Forest/alternating tree
+    // Forest / alternating tree
     label: Vec<i32>,  // EVEN, ODD, UNLABELED
-    forest: Vec<i32>, // parent in alternating forest
+    forest: Vec<i32>, // parent in alternating forest (-1 for root/none)
     root: Vec<usize>, // root of tree
 
     // Matching
-    mate: Vec<i32>,      // matched vertex
+    mate: Vec<i32>,      // matched vertex (-1 for unmatched)
     mate_edge: Vec<i32>, // matched edge index
 
-    // Dual variables (for weighted matching)
-    dual: Vec<f64>,  // dual variables for blossoms
-    slack: Vec<f64>, // slack for edges
+    // Dual variables (for weighted matching / slack)
+    dual: Vec<f64>,
+    slack: Vec<f64>,
 
     // Blocked blossoms (dual > 0)
     blocked: Vec<bool>,
@@ -59,7 +60,7 @@ pub struct EdmondsAlgorithm {
     // Visited tracking
     visited: Vec<bool>,
 
-    // Metadata
+    // Execution metadata
     iterations: usize,
     blossoms_created: usize,
     blossoms_expanded: usize,
@@ -67,6 +68,7 @@ pub struct EdmondsAlgorithm {
 }
 
 impl EdmondsAlgorithm {
+    /// Creates a new `EdmondsAlgorithm` instance initialized for the given graph.
     pub fn new(graph: &Graph) -> Self {
         let n = graph.n;
         let m = graph.edges.len();
@@ -79,13 +81,15 @@ impl EdmondsAlgorithm {
         let mut edge_weights = vec![0.0; m];
 
         for (idx, e) in graph.edges.iter().enumerate() {
-            adj_list[e.u].push(idx);
-            adj_list[e.v].push(idx);
-            adj_mat[e.u][e.v] = true;
-            adj_mat[e.v][e.u] = true;
-            edge_index[e.u][e.v] = idx;
-            edge_index[e.v][e.u] = idx;
-            edge_weights[idx] = e.weight.unwrap_or(1.0);
+            if e.u < n && e.v < n {
+                adj_list[e.u].push(idx);
+                adj_list[e.v].push(idx);
+                adj_mat[e.u][e.v] = true;
+                adj_mat[e.v][e.u] = true;
+                edge_index[e.u][e.v] = idx;
+                edge_index[e.v][e.u] = idx;
+                edge_weights[idx] = e.weight.unwrap_or(1.0);
+            }
         }
 
         Self {
@@ -167,13 +171,16 @@ impl EdmondsAlgorithm {
             self.tip[i] = i;
         }
         self.slack.fill(0.0);
+        self.iterations = 0;
+        self.blossoms_created = 0;
+        self.blossoms_expanded = 0;
+        self.dual_updates = 0;
     }
 
     fn get_free_index(&mut self) -> usize {
         if let Some(idx) = self.free_indices.pop() {
             idx
         } else {
-            // Expand arrays if needed
             let new_idx = self.outer.len();
             self.outer.push(0);
             self.deep.push(Vec::new());
@@ -192,10 +199,12 @@ impl EdmondsAlgorithm {
         }
     }
 
+    #[inline]
     fn is_edge_blocked_idx(&self, idx: usize) -> bool {
         greater(self.slack[idx], 0.0)
     }
 
+    #[inline]
     fn is_edge_blocked(&self, u: usize, v: usize) -> bool {
         let idx = self.edge_index[u][v];
         if idx != usize::MAX {
@@ -205,23 +214,30 @@ impl EdmondsAlgorithm {
         }
     }
 
+    #[inline]
     fn is_adjacent(&self, u: usize, v: usize) -> bool {
         self.adj_mat[u][v] && !self.is_edge_blocked(u, v)
     }
 
+    /// Grows the alternating forest and performs augmentations or blossom contractions.
+    /// Returns `true` if an augmenting path was found during this stage.
     fn grow(&mut self) -> bool {
         self.reset_state();
-        let mut iteration = 0;
-        const MAX_ITER: usize = 1000;
+        let max_iter = self.n.max(50) * 20;
+        let mut loop_count = 0;
+        let mut augmented = false;
 
-        while let Some(v) = self.queue.pop_front() {
-            if iteration > MAX_ITER {
+        'bfs: while let Some(v) = self.queue.pop_front() {
+            if loop_count > max_iter {
                 break;
             }
-            iteration += 1;
-            let w = self.outer[v];
+            loop_count += 1;
+            self.iterations += 1;
 
-            for &di in &self.deep[w].clone() {
+            let w = self.outer[v];
+            let deep_w = self.deep[w].clone();
+
+            'scan_deep: for &di in &deep_w {
                 for &edge_idx in &self.adj_list[di] {
                     let u = if self.edges[edge_idx].u == di {
                         self.edges[edge_idx].v
@@ -240,86 +256,111 @@ impl EdmondsAlgorithm {
 
                     if self.label[ou] != EVEN {
                         let vm = self.mate[ou];
+                        if vm < 0 {
+                            continue;
+                        }
                         self.forest[ou] = w as i32;
                         self.label[ou] = ODD;
                         self.root[ou] = self.root[w];
-                        self.forest[self.outer[vm as usize]] = ou as i32;
-                        self.label[self.outer[vm as usize]] = EVEN;
-                        self.root[self.outer[vm as usize]] = self.root[w];
+                        let outer_vm = self.outer[vm as usize];
+                        self.forest[outer_vm] = ou as i32;
+                        self.label[outer_vm] = EVEN;
+                        self.root[outer_vm] = self.root[w];
 
-                        if !self.visited[self.outer[vm as usize]] {
+                        if !self.visited[outer_vm] {
                             self.queue.push_back(vm as usize);
-                            self.visited[self.outer[vm as usize]] = true;
+                            self.visited[outer_vm] = true;
                         }
                     } else if self.root[ou] != self.root[w] {
                         self.augment(w, u);
+                        augmented = true;
                         self.reset_state();
-                        break;
-                    } else if w != u {
-                        let _ = self.blossom(w, u);
-                        break;
+                        break 'bfs;
+                    } else if w != ou {
+                        self.blossom(w, u);
+                        break 'scan_deep;
                     }
                 }
             }
         }
 
-        let mut perfect = true;
-        for i in 0..self.n {
-            if self.mate[self.outer[i]] == -1 {
-                perfect = false;
-                break;
-            }
-        }
-        perfect
+        augmented
     }
 
+    /// Contracts an odd alternating cycle between `u` and `v` into a new blossom.
     fn blossom(&mut self, u: usize, v: usize) -> usize {
         let t = self.get_free_index();
         self.blossoms_created += 1;
 
-        // Ensure arrays are large enough for the new index
         let max_idx = t.max(self.outer.len() - 1);
         let mut is_in_path = vec![false; max_idx + 1];
+
+        // Trace path from u to root
         let mut u_ = u;
         while u_ != usize::MAX {
             let ou = self.outer[u_];
             if ou < is_in_path.len() {
                 is_in_path[ou] = true;
             }
-            u_ = self.forest[ou] as usize;
+            let parent = self.forest[ou];
+            u_ = if parent >= 0 {
+                parent as usize
+            } else {
+                usize::MAX
+            };
         }
 
+        // Find LCA with path from v
         let mut v_ = self.outer[v];
         while v_ < is_in_path.len() && !is_in_path[v_] {
-            v_ = self.outer[self.forest[v_] as usize];
+            let parent = self.forest[v_];
+            if parent < 0 {
+                break;
+            }
+            v_ = self.outer[parent as usize];
         }
         self.tip[t] = v_;
 
-        // Build odd circuit
-        let mut circuit = Vec::new();
+        // Build odd circuit in true cyclic order: tip -> ... -> u -> v -> ... -> tip
+        let mut path_u = Vec::new();
         u_ = self.outer[u];
-        circuit.push(u_);
         while u_ != self.tip[t] {
-            u_ = self.outer[self.forest[u_] as usize];
-            circuit.push(u_);
+            path_u.push(u_);
+            let parent = self.forest[u_];
+            if parent < 0 {
+                break;
+            }
+            u_ = self.outer[parent as usize];
+        }
+
+        let mut path_v = Vec::new();
+        v_ = self.outer[v];
+        while v_ != self.tip[t] {
+            path_v.push(v_);
+            let parent = self.forest[v_];
+            if parent < 0 {
+                break;
+            }
+            v_ = self.outer[parent as usize];
         }
 
         self.shallow[t].clear();
         self.deep[t].clear();
-        for &x in &circuit {
+
+        self.shallow[t].push(self.tip[t]);
+        for &x in path_u.iter().rev() {
+            self.shallow[t].push(x);
+        }
+        for &x in &path_v {
             self.shallow[t].push(x);
         }
 
-        v_ = self.outer[v];
-        while v_ != self.tip[t] {
-            self.shallow[t].push(v_);
-            v_ = self.outer[self.forest[v_] as usize];
-        }
-
-        // Build deep and update outer
-        for &x in &self.shallow[t].clone() {
+        // Build deep vertices and update outer pointers
+        let shallow_t = self.shallow[t].clone();
+        for &x in &shallow_t {
             self.outer[x] = t;
-            for &y in &self.deep[x].clone() {
+            let deep_x = self.deep[x].clone();
+            for &y in &deep_x {
                 self.deep[t].push(y);
                 self.outer[y] = t;
             }
@@ -333,11 +374,26 @@ impl EdmondsAlgorithm {
         self.mate[t] = self.mate[self.tip[t]];
         self.mate_edge[t] = self.mate_edge[self.tip[t]];
 
+        if !self.visited[t] {
+            self.queue.push_back(self.tip[t]);
+            self.visited[t] = true;
+        }
+
         t
     }
 
+    /// Expands a contracted blossom vertex back to its constituents.
     fn expand(&mut self, u: usize, expand_blocked: bool) {
-        let v = self.outer[self.mate[u] as usize];
+        if u < self.n || (self.blocked[u] && !expand_blocked) {
+            return;
+        }
+
+        self.blossoms_expanded += 1;
+        let mate_u = self.mate[u];
+        if mate_u < 0 {
+            return;
+        }
+        let v = self.outer[mate_u as usize];
 
         // Find minimum index edge connecting u and v
         let mut min_idx = self.m;
@@ -362,10 +418,6 @@ impl EdmondsAlgorithm {
         self.mate_edge[u] = min_idx as i32;
         self.mate_edge[v] = min_idx as i32;
 
-        if u < self.n || (self.blocked[u] && !expand_blocked) {
-            return;
-        }
-
         // Find new tip
         let mut found = false;
         while !found && !self.shallow[u].is_empty() {
@@ -382,19 +434,22 @@ impl EdmondsAlgorithm {
             }
         }
 
-        // Adjust mates along circuit
-        self.mate[self.shallow[u][0]] = self.mate[u];
-        let mut i = 1;
-        while i < self.shallow[u].len() {
-            let a = self.shallow[u][i];
-            let b = self.shallow[u][(i + 1) % self.shallow[u].len()];
-            self.mate[a] = b as i32;
-            self.mate[b] = a as i32;
-            i += 2;
+        if !self.shallow[u].is_empty() {
+            // Adjust mates along circuit
+            self.mate[self.shallow[u][0]] = self.mate[u];
+            let mut i = 1;
+            while i < self.shallow[u].len() {
+                let a = self.shallow[u][i];
+                let b = self.shallow[u][(i + 1) % self.shallow[u].len()];
+                self.mate[a] = b as i32;
+                self.mate[b] = a as i32;
+                i += 2;
+            }
         }
 
         // Deactivate blossom
-        for &s in &self.shallow[u] {
+        let shallow_u = self.shallow[u].clone();
+        for &s in &shallow_u {
             self.outer[s] = s;
             for &x in &self.deep[s] {
                 self.outer[x] = s;
@@ -404,12 +459,12 @@ impl EdmondsAlgorithm {
         self.free_indices.push(u);
 
         // Recursively expand
-        let shallow_u = self.shallow[u].clone();
         for s in shallow_u {
             self.expand(s, expand_blocked);
         }
     }
 
+    /// Augments the current matching along the path between `u` and `v`.
     fn augment(&mut self, u: usize, v: usize) {
         let mut p = self.outer[u];
         let mut q = self.outer[v];
@@ -421,9 +476,13 @@ impl EdmondsAlgorithm {
         self.expand(p, false);
         self.expand(q, false);
 
-        while fp != -1 {
-            q = self.outer[self.forest[p] as usize];
-            p = self.outer[self.forest[q] as usize];
+        while fp >= 0 {
+            q = self.outer[fp as usize];
+            let fq = self.forest[q];
+            if fq < 0 {
+                break;
+            }
+            p = self.outer[fq as usize];
             fp = self.forest[p];
             self.mate[p] = q as i32;
             self.mate[q] = p as i32;
@@ -433,9 +492,13 @@ impl EdmondsAlgorithm {
 
         p = outv;
         fp = self.forest[p];
-        while fp != -1 {
-            q = self.outer[self.forest[p] as usize];
-            p = self.outer[self.forest[q] as usize];
+        while fp >= 0 {
+            q = self.outer[fp as usize];
+            let fq = self.forest[q];
+            if fq < 0 {
+                break;
+            }
+            p = self.outer[fq as usize];
             fp = self.forest[p];
             self.mate[p] = q as i32;
             self.mate[q] = p as i32;
@@ -449,9 +512,11 @@ impl EdmondsAlgorithm {
             return;
         }
 
-        for s in self.shallow[t].clone() {
+        let shallow_t = self.shallow[t].clone();
+        for s in shallow_t {
             self.outer[s] = s;
-            for x in self.deep[s].clone() {
+            let deep_s = self.deep[s].clone();
+            for x in deep_s {
                 self.outer[x] = s;
             }
             self.destroy_blossom(s);
@@ -474,42 +539,36 @@ impl EdmondsAlgorithm {
         for i in 0..self.m {
             let u = self.edges[i].u;
             let v = self.edges[i].v;
-            if self.mate[u] == v as i32 {
+            if u < self.n && v < self.n && self.mate[u] == v as i32 {
                 matching.push(i);
             }
         }
         matching
     }
-}
 
-impl EdmondsAlgorithm {
-    pub fn name(&self) -> &'static str {
-        "edmonds"
-    }
-
+    /// Computes maximum cardinality matching on the graph.
     pub fn max_cardinality(&mut self, _graph: &Graph) -> MatchingResult {
         let start = std::time::Instant::now();
         self.clear_all();
 
-        // Keep growing until no more augmenting paths found
-        let mut perfect = false;
-        let mut grow_calls = 0;
-        while !perfect {
-            grow_calls += 1;
-            if grow_calls > 100 {
+        // Keep growing alternating paths until no augmenting path is found
+        let mut max_passes = self.n;
+        while max_passes > 0 {
+            max_passes -= 1;
+            let found_path = self.grow();
+            if !found_path {
                 break;
             }
-            perfect = self.grow();
         }
 
         let edges = self.retrieve_matching();
-
         let total_weight: f64 = edges.iter().map(|&i| self.edge_weights[i]).sum();
+        let is_perfect = edges.len() * 2 == self.n;
 
         MatchingResult {
             edges,
             total_weight,
-            is_perfect: perfect,
+            is_perfect,
             metadata: MatchingMetadata {
                 iterations: self.iterations,
                 blossoms_created: self.blossoms_created,
@@ -520,7 +579,13 @@ impl EdmondsAlgorithm {
         }
     }
 
-    pub fn min_weight_perfect(&mut self, _graph: &Graph) -> Result<MatchingResult, String> {
-        crate::algorithms::minimum_weight_perfect_matching(_graph)
+    /// Solves minimum weight perfect matching on `graph`.
+    pub fn min_weight_perfect(&mut self, graph: &Graph) -> Result<MatchingResult, String> {
+        crate::algorithms::minimum_weight_perfect_matching(graph)
+    }
+
+    /// Algorithm name
+    pub fn name(&self) -> &'static str {
+        "edmonds"
     }
 }

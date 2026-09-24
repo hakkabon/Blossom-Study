@@ -1,18 +1,50 @@
 //! Blossom Algorithm Study - CLI and REPL for matching algorithms
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use blossom_study::{algorithms, graph};
 use clap::{Parser, Subcommand, ValueEnum};
 use rustyline::DefaultEditor;
 
-#[derive(Clone, Debug, ValueEnum)]
-enum Algorithm {
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum Algorithm {
     /// Original Edmonds implementation
     Edmonds,
     /// Korte-Vygen implementation (Union-Find based)
     KorteVygen,
     /// Fast Blossom (DSU with timestamp LCA)
     FastBlossom,
+}
+
+impl Algorithm {
+    pub fn max_cardinality(&self, graph: &graph::Graph) -> algorithms::MatchingResult {
+        match self {
+            Algorithm::Edmonds => {
+                let mut algo = algorithms::EdmondsAlgorithm::new(graph);
+                algo.max_cardinality(graph)
+            }
+            Algorithm::KorteVygen => algorithms::KorteVygenEdmonds::max_cardinality_matching(graph),
+            Algorithm::FastBlossom => {
+                algorithms::FastBlossomMatching::max_cardinality_matching(graph)
+            }
+        }
+    }
+
+    pub fn min_weight_perfect(
+        &self,
+        graph: &graph::Graph,
+    ) -> Result<algorithms::MatchingResult, String> {
+        match self {
+            Algorithm::Edmonds => {
+                algorithms::EdmondsAlgorithm::new(graph).min_weight_perfect(graph)
+            }
+            Algorithm::KorteVygen => {
+                algorithms::KorteVygenEdmonds::min_weight_perfect_matching(graph)
+            }
+            Algorithm::FastBlossom => {
+                algorithms::FastBlossomMatching::min_weight_perfect_matching(graph)
+            }
+        }
+    }
 }
 
 #[derive(Parser)]
@@ -84,35 +116,16 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::MaxCardinality { input, output } => {
             let graph = load_graph(&input)?;
-            let result = match cli.algorithm {
-                Algorithm::Edmonds => {
-                    let mut algo = algorithms::EdmondsAlgorithm::new(&graph);
-                    algo.max_cardinality(&graph)
-                }
-                Algorithm::KorteVygen => {
-                    algorithms::KorteVygenEdmonds::max_cardinality_matching(&graph)
-                }
-                Algorithm::FastBlossom => {
-                    algorithms::FastBlossomMatching::max_cardinality_matching(&graph)
-                }
-            };
-            print_result(&result, output)?;
+            let result = cli.algorithm.max_cardinality(&graph);
+            print_matching_result(&result, output.as_deref(), false)?;
         }
         Commands::MinWeightPerfect { input, output } => {
             let graph = load_graph(&input)?;
-            let result = match cli.algorithm {
-                Algorithm::Edmonds => {
-                    algorithms::EdmondsAlgorithm::new(&graph).min_weight_perfect(&graph)
-                }
-                Algorithm::KorteVygen => {
-                    algorithms::KorteVygenEdmonds::min_weight_perfect_matching(&graph)
-                }
-                Algorithm::FastBlossom => {
-                    algorithms::FastBlossomMatching::min_weight_perfect_matching(&graph)
-                }
-            }
-            .map_err(anyhow::Error::msg)?;
-            print_result(&result, output)?;
+            let result = cli
+                .algorithm
+                .min_weight_perfect(&graph)
+                .map_err(anyhow::Error::msg)?;
+            print_matching_result(&result, output.as_deref(), false)?;
         }
         Commands::Generate {
             n,
@@ -138,9 +151,7 @@ fn main() -> Result<()> {
             );
         }
         Commands::Bench { config, output } => {
-            println!("Running benchmarks...");
-            // TODO: Implement benchmark runner
-            println!("Config: {:?}, Output: {}", config, output);
+            run_benchmarks(config, &output)?;
         }
         Commands::Repl { load } => {
             run_repl(load, cli.algorithm)?;
@@ -161,40 +172,142 @@ fn load_graph(path: &str) -> Result<graph::Graph> {
         "dimacs" | "dat" | "txt" => {
             graph::Graph::from_dimacs_file(path).map_err(anyhow::Error::from)
         }
-        _ => {
-            // Try JSON first, then DIMACS
-            graph::Graph::from_json_file(path)
-                .map_err(anyhow::Error::from)
-                .or_else(|_| graph::Graph::from_dimacs_file(path).map_err(anyhow::Error::from))
-        }
+        _ => graph::Graph::from_json_file(path)
+            .or_else(|_| graph::Graph::from_dimacs_file(path))
+            .with_context(|| format!("Failed to parse graph from '{}'", path)),
     }
 }
 
-fn print_result(result: &algorithms::MatchingResult, output: Option<String>) -> Result<()> {
-    // Compact output format
-    println!("matching_size={}", result.edges.len());
-    println!("total_weight={:.6}", result.total_weight);
-    println!("is_perfect={}", result.is_perfect);
-    println!("iterations={}", result.metadata.iterations);
-    println!("blossoms_created={}", result.metadata.blossoms_created);
-    println!("blossoms_expanded={}", result.metadata.blossoms_expanded);
-    println!("dual_updates={}", result.metadata.dual_updates);
-    println!("runtime_ms={:.3}", result.metadata.runtime_ms);
-
-    if !result.edges.is_empty() {
-        print!("edges=");
-        for (i, &e) in result.edges.iter().enumerate() {
-            if i > 0 {
-                print!(" ");
+fn print_matching_result(
+    result: &algorithms::MatchingResult,
+    output: Option<&str>,
+    compact: bool,
+) -> Result<()> {
+    if compact {
+        println!("=== Matching Result ===");
+        println!("  size:         {}", result.edges.len());
+        println!("  weight:       {:.6}", result.total_weight);
+        println!("  perfect:      {}", result.is_perfect);
+        println!("  iterations:   {}", result.metadata.iterations);
+        println!(
+            "  blossoms:     created={}, expanded={}",
+            result.metadata.blossoms_created, result.metadata.blossoms_expanded
+        );
+        println!("  dual_updates: {}", result.metadata.dual_updates);
+        println!("  time:         {:.3} ms", result.metadata.runtime_ms);
+        if !result.edges.is_empty() {
+            print!("  edges:        ");
+            for (i, &e) in result.edges.iter().enumerate() {
+                if i > 0 {
+                    print!(" ");
+                }
+                print!("{}", e);
             }
-            print!("{}", e);
+            println!();
         }
         println!();
+    } else {
+        println!("matching_size={}", result.edges.len());
+        println!("total_weight={:.6}", result.total_weight);
+        println!("is_perfect={}", result.is_perfect);
+        println!("iterations={}", result.metadata.iterations);
+        println!("blossoms_created={}", result.metadata.blossoms_created);
+        println!("blossoms_expanded={}", result.metadata.blossoms_expanded);
+        println!("dual_updates={}", result.metadata.dual_updates);
+        println!("runtime_ms={:.3}", result.metadata.runtime_ms);
+
+        if !result.edges.is_empty() {
+            print!("edges=");
+            for (i, &e) in result.edges.iter().enumerate() {
+                if i > 0 {
+                    print!(" ");
+                }
+                print!("{}", e);
+            }
+            println!();
+        }
     }
 
     if let Some(out) = output {
         std::fs::write(out, serde_json::to_string_pretty(result)?)?;
     }
+    Ok(())
+}
+
+fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
+    let config = if let Some(ref path) = config_path {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("Could not read config file '{}'", path))?;
+        serde_json::from_str(&content)
+            .with_context(|| format!("Could not parse config file '{}'", path))?
+    } else {
+        algorithms::BenchConfig::default()
+    };
+
+    println!("Running Blossom Benchmark Suite");
+    println!("Output directory: {}", output_dir);
+    println!("Graph sizes: {:?}", config.graph_sizes);
+    println!("Densities: {:?}", config.densities);
+    println!("Algorithms: {:?}", config.algorithms);
+    println!();
+
+    std::fs::create_dir_all(output_dir)?;
+
+    println!(
+        "{:<15} | {:>6} | {:>8} | {:>10} | {:>8} | {:>10} | {:>8}",
+        "Algorithm", "V", "E", "Weight", "Size", "Time (ms)", "Perfect"
+    );
+    println!(
+        "{:-<15}-|-{:-<6}-|-{:-<8}-|-{:-<10}-|-{:-<8}-|-{:-<10}-|-{:-<8}",
+        "", "", "", "", "", "", ""
+    );
+
+    let mut records = Vec::new();
+
+    for &n in &config.graph_sizes {
+        for &density in &config.densities {
+            let m = (((n * (n.saturating_sub(1))) as f64 * density * 0.5) as usize).max(1);
+            let graph = if density >= 0.99 {
+                graph::generator::complete_graph(n, (1.0, 100.0))
+            } else {
+                graph::generator::random_sparse(n, m, (1.0, 100.0))
+            };
+
+            for algo_name in &config.algorithms {
+                let algo = match algo_name.to_lowercase().as_str() {
+                    "edmonds" => Algorithm::Edmonds,
+                    "korte_vygen" | "kv" => Algorithm::KorteVygen,
+                    "fast_blossom" | "fast" => Algorithm::FastBlossom,
+                    _ => continue,
+                };
+
+                let res = algo.max_cardinality(&graph);
+
+                println!(
+                    "{:<15} | {:>6} | {:>8} | {:>10.2} | {:>8} | {:>10.3} | {:>8}",
+                    algo_name,
+                    graph.n,
+                    graph.edges.len(),
+                    res.total_weight,
+                    res.edges.len(),
+                    res.metadata.runtime_ms,
+                    res.is_perfect
+                );
+
+                records.push(serde_json::json!({
+                    "algorithm": algo_name,
+                    "n": graph.n,
+                    "m": graph.edges.len(),
+                    "density": density,
+                    "result": res,
+                }));
+            }
+        }
+    }
+
+    let out_path = format!("{}/bench_results.json", output_dir);
+    std::fs::write(&out_path, serde_json::to_string_pretty(&records)?)?;
+    println!("\nWrote detailed benchmark data to {}", out_path);
     Ok(())
 }
 
@@ -275,19 +388,8 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                     }
                     "max" => {
                         if let Some(ref g) = graph {
-                            let result = match current_algorithm {
-                                Algorithm::Edmonds => {
-                                    let mut algo = algorithms::EdmondsAlgorithm::new(g);
-                                    algo.max_cardinality(g)
-                                }
-                                Algorithm::KorteVygen => {
-                                    algorithms::KorteVygenEdmonds::max_cardinality_matching(g)
-                                }
-                                Algorithm::FastBlossom => {
-                                    algorithms::FastBlossomMatching::max_cardinality_matching(g)
-                                }
-                            };
-                            print_compact_result(&result);
+                            let result = current_algorithm.max_cardinality(g);
+                            print_matching_result(&result, None, true)?;
                             last_result = Some(result);
                         } else {
                             println!("No graph loaded. Use 'load <file>' first.");
@@ -295,20 +397,9 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                     }
                     "min" => {
                         if let Some(ref g) = graph {
-                            let result = match current_algorithm {
-                                Algorithm::Edmonds => {
-                                    algorithms::EdmondsAlgorithm::new(g).min_weight_perfect(g)
-                                }
-                                Algorithm::KorteVygen => {
-                                    algorithms::KorteVygenEdmonds::min_weight_perfect_matching(g)
-                                }
-                                Algorithm::FastBlossom => {
-                                    algorithms::FastBlossomMatching::min_weight_perfect_matching(g)
-                                }
-                            };
-                            match result {
+                            match current_algorithm.min_weight_perfect(g) {
                                 Ok(result) => {
-                                    print_compact_result(&result);
+                                    print_matching_result(&result, None, true)?;
                                     last_result = Some(result);
                                 }
                                 Err(e) => println!("Error: {}", e),
@@ -349,7 +440,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                     }
                     "result" => {
                         if let Some(ref r) = last_result {
-                            print_compact_result(r);
+                            print_matching_result(r, None, true)?;
                         } else {
                             println!("No result available. Run 'max' or 'min' first.");
                         }
@@ -415,29 +506,4 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
         }
     }
     Ok(())
-}
-
-fn print_compact_result(result: &algorithms::MatchingResult) {
-    println!("=== Matching Result ===");
-    println!("  size:       {}", result.edges.len());
-    println!("  weight:     {:.6}", result.total_weight);
-    println!("  perfect:    {}", result.is_perfect);
-    println!("  iterations: {}", result.metadata.iterations);
-    println!(
-        "  blossoms:   created={}, expanded={}",
-        result.metadata.blossoms_created, result.metadata.blossoms_expanded
-    );
-    println!("  dual_updates: {}", result.metadata.dual_updates);
-    println!("  time:       {:.3} ms", result.metadata.runtime_ms);
-    if !result.edges.is_empty() {
-        print!("  edges:      ");
-        for (i, &e) in result.edges.iter().enumerate() {
-            if i > 0 {
-                print!(" ");
-            }
-            print!("{}", e);
-        }
-        println!();
-    }
-    println!();
 }

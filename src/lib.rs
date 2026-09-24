@@ -5,3 +5,9 @@
 
 pub mod algorithms;
 pub mod graph;
+
+pub use algorithms::{
+    EdmondsAlgorithm, FastBlossomMatching, KorteVygenEdmonds, MatchingAlgorithm, MatchingMetadata,
+    MatchingResult, minimum_weight_perfect_matching,
+};
+pub use graph::{Edge, Graph};

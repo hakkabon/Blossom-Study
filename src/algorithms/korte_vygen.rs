@@ -1,12 +1,28 @@
-//! Edmonds' Blossom Algorithm for Maximum Cardinality Matching
+//! Edmonds' Blossom Algorithm for Maximum Cardinality Matching via Ear Decompositions
 //!
-//! Translated from the Korte-Vygen C++ implementation (edmonds.cpp/h)
-//! Based on: Combinatorial Optimization, Theory and Algorithms, by Korte & Vygen
+//! Based on: B. Korte & J. Vygen, *Combinatorial Optimization: Theory and Algorithms*,
+//! Springer, Chapter on "Matchings and Matroids".
 //!
-//! This implementation uses:
-//! - Union-Find for blossom contraction (rho mapping)
-//! - phi/mu mappings for alternating ear decompositions
-//! - Path-to-root for finding augmenting paths
+//! # Structural Mappings
+//!
+//! The Korte-Vygen formulation uses three elegant mappings to maintain the alternating forest:
+//! - $\mu(v)$ (`mu`): Current matching partner ($\mu(v) = v$ when $v$ is unmatched).
+//! - $\phi(v)$ (`phi`): For inner vertices, points towards the tree root. For blossom vertices,
+//!   it encodes the alternating ear decomposition cycle so augmenting paths can unwind
+//!   blossoms without recursive unshrinking.
+//! - $\rho(v)$ (`rho`): A Disjoint-Set Union (Union-Find) structure identifying the base
+//!   (representative) of the outermost blossom containing $v$.
+//!
+//! # Algorithmic Stages
+//!
+//! 1. **Greedy Initialization**: An initial maximal matching is constructed greedily.
+//! 2. **Forest Expansion & Ear Contraction**:
+//!    Unmatched vertices start as tree roots (outer vertices). Unscanned outer vertices
+//!    explore incident edges:
+//!    - Edge to an unreached vertex: **Grows** the alternating tree.
+//!    - Edge to an outer vertex in a different tree: **Augments** the matching along $P(x) \cup P(y)$.
+//!    - Edge to an outer vertex in the same tree: **Shrinks** the odd cycle into a blossom
+//!      by uniting bases in $\rho$ and closing the $\phi$ pointer cycle (converting the path into an ear).
 
 use crate::algorithms::union_find::UnionFind;
 use crate::algorithms::{MatchingMetadata, MatchingResult};
@@ -14,7 +30,7 @@ use crate::graph::Graph;
 use std::collections::VecDeque;
 use std::time::Instant;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum VertexType {
     Inner,
     Outer,
@@ -48,9 +64,15 @@ pub struct KorteVygenEdmonds {
     rho: UnionFind,
 
     n: usize,
+
+    // Performance telemetry
+    iterations: usize,
+    blossoms_created: usize,
+    blossoms_expanded: usize,
 }
 
 impl KorteVygenEdmonds {
+    /// Creates a new solver initialized with `graph`
     pub fn new(graph: &Graph) -> Self {
         let n = graph.n;
         Self {
@@ -63,17 +85,23 @@ impl KorteVygenEdmonds {
             forest: vec![Vec::new(); n],
             rho: UnionFind::new(),
             n,
+            iterations: 0,
+            blossoms_created: 0,
+            blossoms_expanded: 0,
         }
     }
 
+    #[inline]
     fn is_outer_vertex(&self, v: usize) -> bool {
         self.mu[v] == v || self.phi[self.mu[v]] != self.mu[v]
     }
 
+    #[inline]
     fn is_inner_vertex(&self, v: usize) -> bool {
         self.phi[self.mu[v]] == self.mu[v] && self.phi[v] != v
     }
 
+    #[inline]
     fn vertex_type(&self, v: usize) -> VertexType {
         if self.is_outer_vertex(v) {
             VertexType::Outer
@@ -166,6 +194,7 @@ impl KorteVygenEdmonds {
     }
 
     fn augment(&mut self, px: &[usize], py: &[usize]) {
+        self.blossoms_expanded += 1;
         let x = px[0];
         let y = py[0];
 
@@ -191,25 +220,19 @@ impl KorteVygenEdmonds {
         let rx = px[px.len() - 1]; // root of x tree
         let ry = py[py.len() - 1]; // root of y tree
 
-        // Reset the root rx
+        // Reset root rx and all its descendants without cloning memory
         self.remove_vertex_from_tree(rx);
-
-        // ... and all its descendants
-        let forest_rx = self.forest[rx].clone();
+        let forest_rx = std::mem::take(&mut self.forest[rx]);
         for v in forest_rx {
             self.remove_vertex_from_tree(v);
         }
-        self.forest[rx].clear();
 
-        // Reset the root ry
+        // Reset root ry and all its descendants without cloning memory
         self.remove_vertex_from_tree(ry);
-
-        // ... and all its descendants
-        let forest_ry = self.forest[ry].clone();
+        let forest_ry = std::mem::take(&mut self.forest[ry]);
         for v in forest_ry {
             self.remove_vertex_from_tree(v);
         }
-        self.forest[ry].clear();
     }
 
     fn convert_path_to_ear(&mut self, path: &[usize], r_idx: usize) {
@@ -270,13 +293,13 @@ impl KorteVygenEdmonds {
     }
 
     fn shrink(&mut self, px: &[usize], py: &[usize]) {
+        self.blossoms_created += 1;
         let x = px[0];
         let y = py[0];
 
         // Find first vertex r in intersection of P(x) and P(y) which has
         // rho(r) == r (is the base of a blossom or inner vertex).
         // We do this by scanning the paths backwards.
-
         let mut r = 0;
         let mut r_idx = 0;
 
@@ -316,6 +339,7 @@ impl KorteVygenEdmonds {
 
     fn step(&mut self, x: usize) {
         loop {
+            self.iterations += 1;
             assert!(self.is_outer_vertex(x) && !self.scanned[x]);
 
             // Find a neighbor of x which is either out-of-tree
@@ -364,6 +388,7 @@ impl KorteVygenEdmonds {
         }
     }
 
+    /// Computes maximum cardinality matching
     pub fn max_cardinality(&mut self) -> MatchingResult {
         let start = Instant::now();
 
@@ -374,6 +399,9 @@ impl KorteVygenEdmonds {
         self.scanned.resize(self.n, false);
         self.tree.resize(self.n, 0);
         self.forest = vec![Vec::new(); self.n];
+        self.iterations = 0;
+        self.blossoms_created = 0;
+        self.blossoms_expanded = 0;
 
         // Initialize empty matching
         let mut sorting: Vec<usize> = (0..self.n).collect();
@@ -385,11 +413,13 @@ impl KorteVygenEdmonds {
         // Sort by vertex degree for initial greedy matching
         sorting.sort_by_key(|&v| self.graph.adj_list[v].len());
 
-        // Start with greedy matching
+        // Start with greedy matching (each vertex examined is counted as one iteration)
         for &v in &sorting {
             if self.mu[v] != v {
                 continue;
             }
+
+            self.iterations += 1;
 
             for &edge_idx in &self.graph.adj_list[v] {
                 let edge = &self.graph.edges[edge_idx];
@@ -416,12 +446,11 @@ impl KorteVygenEdmonds {
         let mut scanned = vec![false; self.n];
 
         for v in 0..self.n {
-            if !scanned[v] && self.mu[v] != v {
-                edges.push(
-                    self.graph
-                        .edge_index(v, self.mu[v])
-                        .expect("matched edge must exist"),
-                );
+            if scanned[v] || self.mu[v] == v {
+                continue;
+            }
+            if let Some(edge_idx) = self.graph.edge_index(v, self.mu[v]) {
+                edges.push(edge_idx);
                 scanned[self.mu[v]] = true;
             }
         }
@@ -437,22 +466,29 @@ impl KorteVygenEdmonds {
             total_weight,
             is_perfect: edge_count * 2 == self.n,
             metadata: MatchingMetadata {
-                iterations: 0,
-                blossoms_created: 0,
-                blossoms_expanded: 0,
+                iterations: self.iterations,
+                blossoms_created: self.blossoms_created,
+                blossoms_expanded: self.blossoms_expanded,
                 dual_updates: 0,
                 runtime_ms: start.elapsed().as_secs_f64() * 1000.0,
             },
         }
     }
+
+    /// Algorithm name
+    pub fn name(&self) -> &'static str {
+        "korte_vygen"
+    }
 }
 
 impl KorteVygenEdmonds {
+    /// Computes maximum cardinality matching on `graph`
     pub fn max_cardinality_matching(graph: &Graph) -> MatchingResult {
         let mut algo = Self::new(graph);
         algo.max_cardinality()
     }
 
+    /// Computes minimum weight perfect matching on `graph`
     pub fn min_weight_perfect_matching(graph: &Graph) -> Result<MatchingResult, String> {
         crate::algorithms::minimum_weight_perfect_matching(graph)
     }

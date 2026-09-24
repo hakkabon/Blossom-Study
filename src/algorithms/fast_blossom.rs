@@ -1,14 +1,31 @@
 //! Fast Blossom Matching Algorithm using DSU with Path Compression
 //!
-//! Based on the implementation from blossom-dsu project.
-//! Features efficient LCA with timestamp-based approach and DSU-based blossom contraction.
+//! Based on Edmonds' Blossom Algorithm optimized with:
+//! - Disjoint Set Union (DSU) for near-$O(1)$ blossom contraction.
+//! - Monotonic timestamp-based Lowest Common Ancestor (LCA) search ($O(\text{cycle})$ without array resets).
+//! - Direct path backtracking without explicit recursive blossom structures.
 //!
-//! Tested against pathological cases:
-//! - Pentagon with Tail (odd cycle with extension)
-//! - Nested Blossoms (blossom inside blossom)
-//! - Unmatchable Triangle (odd cycle, maximum sub-pair limit)
+//! # Algorithmic Details
+//!
+//! 1. **Alternating Forest & DSU Contraction**:
+//!    Vertices are labeled as even (outer / 0) or odd (inner / 1). When two even vertices
+//!    in the same alternating tree are connected by an edge, an odd cycle (blossom) is found.
+//!    All vertices along the cycle are contracted into a single super-vertex represented
+//!    by their LCA root in the DSU.
+//!
+//! 2. **Timestamp LCA**:
+//!    Finding the LCA of two vertices along alternating paths typically requires marking
+//!    visited nodes. Instead of clearing a boolean array of size $V$ for every blossom,
+//!    we increment a monotonic `vis_token` counter, giving $O(\text{cycle length})$ LCA lookup.
+//!
+//! 3. **Augmentation**:
+//!    When an even vertex discovers an edge to an unmatched vertex (or an even vertex in a
+//!    different tree), an augmenting path is found. Edges along the path are flipped in $O(V)$ time.
 
+use crate::algorithms::{MatchingMetadata, MatchingResult};
+use crate::graph::Graph;
 use std::collections::VecDeque;
+use std::time::Instant;
 
 /// Union-Find (Disjoint Set Union) with path compression
 #[derive(Clone, Debug)]
@@ -68,10 +85,15 @@ pub struct FastBlossomMatching {
     dsu: Dsu,
     vis: Vec<usize>,  // Timestamp array for rapid O(1) LCA lookups
     vis_token: usize, // Incremental token to avoid resetting 'vis' array
+
+    // Execution metrics
+    iterations: usize,
+    blossoms_created: usize,
+    blossoms_expanded: usize,
 }
 
 impl FastBlossomMatching {
-    /// Create a new matcher with adjacency list
+    /// Creates a new matcher with given adjacency list
     pub fn new(n: usize, adj: Vec<Vec<usize>>) -> Self {
         Self {
             n,
@@ -83,22 +105,26 @@ impl FastBlossomMatching {
             dsu: Dsu::new(n),
             vis: vec![0; n],
             vis_token: 0,
+            iterations: 0,
+            blossoms_created: 0,
+            blossoms_expanded: 0,
         }
     }
 
-    /// Create from our Graph structure
-    pub fn from_graph(graph: &crate::graph::Graph) -> Self {
+    /// Creates matcher from a [`Graph`] reference
+    pub fn from_graph(graph: &Graph) -> Self {
         let n = graph.n;
-        // Convert edge indices to vertex adjacency list
         let mut adj = vec![Vec::new(); n];
         for e in &graph.edges {
-            adj[e.u].push(e.v);
-            adj[e.v].push(e.u);
+            if e.u < n && e.v < n && e.u != e.v {
+                adj[e.u].push(e.v);
+                adj[e.v].push(e.u);
+            }
         }
         Self::new(n, adj)
     }
 
-    /// Fast O(Length of Cycle) LCA using monotonic timestamps
+    /// Fast $O(\text{cycle})$ LCA using monotonic timestamps
     fn lca(&mut self, mut u: usize, mut v: usize) -> usize {
         self.vis_token += 1;
         u = self.dsu.find(u);
@@ -121,7 +147,7 @@ impl FastBlossomMatching {
         }
     }
 
-    /// Contracts one side of the blossom up to the LCA base (b)
+    /// Contracts one side of the blossom up to the LCA base (`b`)
     fn mark_blossom(&mut self, mut v: usize, b: usize, u: usize, q: &mut VecDeque<usize>) {
         while self.dsu.find(v) != b {
             let u_next = self.match_pair[v];
@@ -155,10 +181,12 @@ impl FastBlossomMatching {
         self.label[root] = 0;
 
         while let Some(u) = q.pop_front() {
-            // Collect neighbors to avoid borrow conflicts
-            let neighbors = self.adj[u].to_vec();
+            self.iterations += 1;
 
-            for &v in &neighbors {
+            // Index-based iteration avoids allocating a temporary neighbor vector
+            for i in 0..self.adj[u].len() {
+                let v = self.adj[u][i];
+
                 // If v is already part of the same contracted blossom, skip
                 if self.dsu.find(u) == self.dsu.find(v) || self.match_pair[u] == v {
                     continue;
@@ -167,8 +195,9 @@ impl FastBlossomMatching {
                 // Case 1: Blossom detected (collision of two 'outer' nodes)
                 if self.label[v] == 0 {
                     let base_lca = self.lca(u, v);
+                    self.blossoms_created += 1;
 
-                    // Call the DSU loop ONLY for nodes along the cycle paths
+                    // Call the DSU loop for nodes along both branches of the cycle
                     self.mark_blossom(u, base_lca, v, q);
                     self.mark_blossom(v, base_lca, u, q);
                 }
@@ -192,7 +221,7 @@ impl FastBlossomMatching {
         usize::MAX
     }
 
-    /// Solve for maximum cardinality matching
+    /// Solves for maximum cardinality matching, returning slice of matched pairs
     pub fn solve(&mut self) -> &[usize] {
         let mut q = VecDeque::with_capacity(self.n);
 
@@ -200,25 +229,33 @@ impl FastBlossomMatching {
             if self.match_pair[i] == usize::MAX {
                 let mut end_node = self.find_augmenting_path(i, &mut q);
 
-                // Flip edges along the path back to the root
-                while end_node != usize::MAX {
-                    let curr_p = self.p[end_node];
-                    let next_node = self.match_pair[curr_p];
-                    self.match_pair[end_node] = curr_p;
-                    self.match_pair[curr_p] = end_node;
-                    end_node = next_node;
+                if end_node != usize::MAX {
+                    // Flip edges along the path back to the root
+                    while end_node != usize::MAX {
+                        let curr_p = self.p[end_node];
+                        let next_node = self.match_pair[curr_p];
+                        self.match_pair[end_node] = curr_p;
+                        self.match_pair[curr_p] = end_node;
+                        end_node = next_node;
+                    }
+                    self.blossoms_expanded += 1;
                 }
             }
         }
         &self.match_pair
     }
+
+    /// Algorithm name
+    pub fn name(&self) -> &'static str {
+        "fast_blossom"
+    }
 }
 
 /// Convert match_pair array to our MatchingResult format
 impl FastBlossomMatching {
-    pub fn max_cardinality_matching(
-        graph: &crate::graph::Graph,
-    ) -> crate::algorithms::MatchingResult {
+    /// Solves maximum cardinality matching on `graph`
+    pub fn max_cardinality_matching(graph: &Graph) -> MatchingResult {
+        let start = Instant::now();
         let mut matcher = Self::from_graph(graph);
         matcher.solve();
 
@@ -226,12 +263,11 @@ impl FastBlossomMatching {
         let mut scanned = vec![false; matcher.n];
 
         for v in 0..matcher.n {
-            if !scanned[v] && matcher.match_pair[v] != usize::MAX {
-                edges.push(
-                    graph
-                        .edge_index(v, matcher.match_pair[v])
-                        .expect("matched edge must exist"),
-                );
+            if scanned[v] || matcher.match_pair[v] == usize::MAX {
+                continue;
+            }
+            if let Some(edge_idx) = graph.edge_index(v, matcher.match_pair[v]) {
+                edges.push(edge_idx);
                 scanned[matcher.match_pair[v]] = true;
             }
         }
@@ -242,23 +278,22 @@ impl FastBlossomMatching {
             .map(|&i| graph.edges[i].weight.unwrap_or(1.0))
             .sum();
 
-        crate::algorithms::MatchingResult {
+        MatchingResult {
             edges,
             total_weight,
             is_perfect: edge_count * 2 == matcher.n,
-            metadata: crate::algorithms::MatchingMetadata {
-                iterations: 0,
-                blossoms_created: 0,
-                blossoms_expanded: 0,
+            metadata: MatchingMetadata {
+                iterations: matcher.iterations,
+                blossoms_created: matcher.blossoms_created,
+                blossoms_expanded: matcher.blossoms_expanded,
                 dual_updates: 0,
-                runtime_ms: 0.0,
+                runtime_ms: start.elapsed().as_secs_f64() * 1000.0,
             },
         }
     }
 
-    pub fn min_weight_perfect_matching(
-        graph: &crate::graph::Graph,
-    ) -> Result<crate::algorithms::MatchingResult, String> {
+    /// Solves minimum weight perfect matching on `graph`
+    pub fn min_weight_perfect_matching(graph: &Graph) -> Result<MatchingResult, String> {
         crate::algorithms::minimum_weight_perfect_matching(graph)
     }
 }
