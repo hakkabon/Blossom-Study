@@ -76,14 +76,19 @@ impl Graph {
     }
 
     pub fn edge_index(&self, u: usize, v: usize) -> Option<usize> {
-        self.edge_index.as_ref().map(|ei| ei[u][v]).filter(|&i| i != usize::MAX)
+        self.edge_index
+            .as_ref()
+            .map(|ei| ei[u][v])
+            .filter(|&i| i != usize::MAX)
     }
 
     pub fn is_adjacent(&self, u: usize, v: usize) -> bool {
         if let Some(am) = &self.adj_mat {
             am[u][v]
         } else {
-            self.edges.iter().any(|e| (e.u == u && e.v == v) || (e.u == v && e.v == u))
+            self.edges
+                .iter()
+                .any(|e| (e.u == u && e.v == v) || (e.u == v && e.v == u))
         }
     }
 
@@ -115,7 +120,6 @@ impl Graph {
     pub fn from_dimacs_str(s: &str) -> Result<Self, io::Error> {
         let mut n = 0;
         let mut edges = Vec::new();
-        let mut edge_count = 0;
 
         for line in s.lines() {
             let line = line.trim();
@@ -132,40 +136,52 @@ impl Graph {
                 "p" => {
                     if parts.len() >= 4 && parts[1] == "edge" {
                         n = parts[2].parse().map_err(|_| {
-                            io::Error::new(io::ErrorKind::InvalidData, "Invalid vertex count in problem line")
+                            io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "Invalid vertex count in problem line",
+                            )
                         })?;
-                        edge_count = parts[3].parse().map_err(|_| {
-                            io::Error::new(io::ErrorKind::InvalidData, "Invalid edge count in problem line")
+                        let _edge_count: usize = parts[3].parse().map_err(|_| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "Invalid edge count in problem line",
+                            )
                         })?;
                     }
                 }
-                "e" => {
-                    if parts.len() >= 3 {
-                        let u: usize = parts[1].parse().map_err(|_| {
-                            io::Error::new(io::ErrorKind::InvalidData, "Invalid vertex u in edge line")
-                        })?;
-                        let v: usize = parts[2].parse().map_err(|_| {
-                            io::Error::new(io::ErrorKind::InvalidData, "Invalid vertex v in edge line")
-                        })?;
-                        // DIMACS uses 1-based indexing, convert to 0-based
-                        let u = u.saturating_sub(1);
-                        let v = v.saturating_sub(1);
-                        let weight = if parts.len() >= 4 {
-                            Some(parts[3].parse().map_err(|_| {
-                                io::Error::new(io::ErrorKind::InvalidData, "Invalid weight in edge line")
-                            })?)
-                        } else {
-                            None
-                        };
-                        edges.push(Edge::new(u, v, weight));
-                    }
+                "e" if parts.len() >= 3 => {
+                    let u: usize = parts[1].parse().map_err(|_| {
+                        io::Error::new(io::ErrorKind::InvalidData, "Invalid vertex u in edge line")
+                    })?;
+                    let v: usize = parts[2].parse().map_err(|_| {
+                        io::Error::new(io::ErrorKind::InvalidData, "Invalid vertex v in edge line")
+                    })?;
+                    // DIMACS uses 1-based indexing, convert to 0-based
+                    let u = u.saturating_sub(1);
+                    let v = v.saturating_sub(1);
+                    let weight = if parts.len() >= 4 {
+                        Some(parts[3].parse().map_err(|_| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "Invalid weight in edge line",
+                            )
+                        })?)
+                    } else {
+                        None
+                    };
+                    edges.push(Edge::new(u, v, weight));
                 }
                 _ => {}
             }
         }
 
         if n == 0 {
-            n = edges.iter().map(|e| e.u.max(e.v)).max().map(|x| x + 1).unwrap_or(0);
+            n = edges
+                .iter()
+                .map(|e| e.u.max(e.v))
+                .max()
+                .map(|x| x + 1)
+                .unwrap_or(0);
         }
 
         Ok(Graph::from_edges(n, edges))
@@ -216,7 +232,9 @@ pub mod generator {
         while edges.len() < m {
             let u = rng.gen_range(0..n);
             let v = rng.gen_range(0..n);
-            if u == v { continue; }
+            if u == v {
+                continue;
+            }
             let key = (u.min(v), u.max(v));
             if edge_set.insert(key) {
                 let w = rng.gen_range(weight_range.0..weight_range.1);

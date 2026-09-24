@@ -1,6 +1,7 @@
 //! Common types for matching algorithms
 
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 
 /// Result of a matching computation
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -28,7 +29,8 @@ pub struct MatchingMetadata {
 pub trait MatchingAlgorithm {
     fn name(&self) -> &'static str;
     fn max_cardinality(&mut self, graph: &crate::graph::Graph) -> MatchingResult;
-    fn min_weight_perfect(&mut self, graph: &crate::graph::Graph) -> Result<MatchingResult, String>;
+    fn min_weight_perfect(&mut self, graph: &crate::graph::Graph)
+    -> Result<MatchingResult, String>;
 }
 
 /// Benchmark configuration
@@ -53,103 +55,143 @@ impl Default for BenchConfig {
     }
 }
 
-pub mod union_find;
 pub mod edmonds;
-pub mod korte_vygen;
 pub mod fast_blossom;
+pub mod korte_vygen;
+pub mod union_find;
 
 pub use edmonds::EdmondsAlgorithm;
-pub use korte_vygen::KorteVygenEdmonds;
 pub use fast_blossom::FastBlossomMatching;
+pub use korte_vygen::KorteVygenEdmonds;
 
-#[cfg(test)]
-mod fast_blossom_tests {
-    use crate::algorithms::FastBlossomMatching;
-    use crate::graph::Graph;
-
-    /// Helper to convert a list of edges into our Graph format
-    fn build_graph(n: usize, edges: &[(usize, usize)]) -> Graph {
-        let mut graph_edges = Vec::new();
-        for &(u, v) in edges {
-            graph_edges.push(crate::graph::Edge::new(u, v, None));
-        }
-        Graph::from_edges(n, graph_edges)
+/// O(V³) minimum-weight perfect matching via a primal-dual blossom solver.
+///
+/// A cardinality-dominating transformation lets the maximum-weight solver
+/// handle sparse graphs and then minimize cost among all perfect matchings.
+pub fn minimum_weight_perfect_matching(
+    graph: &crate::graph::Graph,
+) -> Result<MatchingResult, String> {
+    if !graph.n.is_multiple_of(2) {
+        return Err("a perfect matching requires an even number of vertices".into());
+    }
+    if graph.n == 0 {
+        return Ok(MatchingResult {
+            edges: Vec::new(),
+            total_weight: 0.0,
+            is_perfect: true,
+            metadata: MatchingMetadata::default(),
+        });
     }
 
-    /// Helper to count total matched edges and verify consistency
-    fn verify_and_count_matches(match_pair: &[usize]) -> usize {
-        let mut count = 0;
-        for (u, &v) in match_pair.iter().enumerate() {
-            if v != usize::MAX {
-                // Symmetrical integrity check: If u matches v, v MUST match u
-                assert_eq!(match_pair[v], u, "Asymmetric match found between {} and {}", u, v);
-                count += 1;
+    let start = Instant::now();
+    let mut edge_for: Vec<Vec<Option<usize>>> = vec![vec![None; graph.n]; graph.n];
+    for (index, edge) in graph.edges.iter().enumerate() {
+        let cost = edge.weight.unwrap_or(1.0);
+        if !cost.is_finite() {
+            return Err(format!("edge {index} has a non-finite weight"));
+        }
+        if edge.u == edge.v {
+            continue;
+        }
+        match edge_for[edge.u][edge.v] {
+            Some(previous) if graph.edges[previous].weight.unwrap_or(1.0) <= cost => {}
+            _ => {
+                edge_for[edge.u][edge.v] = Some(index);
+                edge_for[edge.v][edge.u] = Some(index);
             }
         }
-        // Each matched edge is counted twice (u->v and v->u)
-        count / 2
+    }
+    if edge_for.iter().all(|row| row.iter().all(Option::is_none)) {
+        return Err("graph does not have a perfect matching".into());
     }
 
-    #[test]
-    fn test_pentagon_with_tail() {
-        // Graph structure: 
-        // 0-1-2-3-4 is a 5-cycle (Pentagon). Node 0 also connects to node 5 (the Tail).
-        // Max cardinality matching should yield exactly 3 pairs.
-        let n = 6;
-        let edges = vec![
-            (0, 1), (1, 2), (2, 3), (3, 4), (4, 0), // Pentagon
-            (0, 5)                                  // Tail
-        ];
-        
-        let graph = build_graph(n, &edges);
-        let mut matcher = FastBlossomMatching::from_graph(&graph);
-        let results = matcher.solve();
-
-        let match_count = verify_and_count_matches(results);
-        assert_eq!(match_count, 3, "Pentagon with tail failed to find 3 matches.");
-        
-        // Ensure the isolated tail node (5) successfully forced its way into a match
-        assert_ne!(results[5], usize::MAX, "The tail node 5 was left unmatched.");
+    fn exact_parts(value: f64) -> (i128, i32) {
+        if value == 0.0 {
+            return (0, 0);
+        }
+        let bits = value.to_bits();
+        let sign = if bits >> 63 == 0 { 1_i128 } else { -1_i128 };
+        let biased_exponent = ((bits >> 52) & 0x7ff) as i32;
+        let fraction = bits & ((1_u64 << 52) - 1);
+        if biased_exponent == 0 {
+            (sign * i128::from(fraction), -1074)
+        } else {
+            (
+                sign * i128::from(fraction | (1_u64 << 52)),
+                biased_exponent - 1023 - 52,
+            )
+        }
     }
 
-    #[test]
-    fn test_nested_blossoms() {
-        // A complex general graph where identifying an augmenting path 
-        // forces an inner blossom to contract, which immediately triggers 
-        // an outer blossom contraction.
-        let n = 8;
-        let edges = vec![
-            (0, 1), (1, 2), (2, 0), // Inner triangle blossom (0, 1, 2)
-            (2, 3), (3, 4),         // Path leading out
-            (4, 5), (5, 6), (6, 4), // Outer triangle blossom (4, 5, 6)
-            (0, 7), (6, 7)          // Back-arc link wrapping both together
-        ];
+    let selected: Vec<(usize, usize, usize, i128, i32)> = (0..graph.n)
+        .flat_map(|u| ((u + 1)..graph.n).map(move |v| (u, v)))
+        .filter_map(|(u, v)| {
+            edge_for[u][v].map(|index| {
+                let (mantissa, exponent) = exact_parts(graph.edges[index].weight.unwrap_or(1.0));
+                (u, v, index, mantissa, exponent)
+            })
+        })
+        .collect();
+    let common_exponent = selected
+        .iter()
+        .filter(|(_, _, _, mantissa, _)| *mantissa != 0)
+        .map(|(_, _, _, _, exponent)| *exponent)
+        .min()
+        .unwrap_or(0);
+    let scaled: Vec<(usize, usize, usize, i128)> = selected
+        .into_iter()
+        .map(|(u, v, index, mantissa, exponent)| {
+            let shift = if mantissa == 0 {
+                0
+            } else {
+                u32::try_from(exponent - common_exponent).expect("minimum exponent selected")
+            };
+            1_i128
+                .checked_shl(shift)
+                .and_then(|factor| mantissa.checked_mul(factor))
+                .map(|cost| (u, v, index, cost))
+                .ok_or_else(|| "edge-weight precision range exceeds i128 capacity".to_string())
+        })
+        .collect::<Result<_, _>>()?;
+    let min_cost = scaled.iter().map(|(_, _, _, cost)| *cost).min().unwrap();
+    let max_cost = scaled.iter().map(|(_, _, _, cost)| *cost).max().unwrap();
+    let cardinality_bonus = max_cost
+        .checked_sub(min_cost)
+        .and_then(|range| range.checked_mul(i128::try_from(graph.n / 2).unwrap()))
+        .and_then(|value| value.checked_add(1))
+        .ok_or_else(|| "edge-weight range is too large".to_string())?;
 
-        let graph = build_graph(n, &edges);
-        let mut matcher = FastBlossomMatching::from_graph(&graph);
-        let results = matcher.solve();
-
-        let match_count = verify_and_count_matches(results);
-        // An 8 node graph with this configuration allows a perfect matching (4 pairs)
-        assert_eq!(match_count, 4, "Nested blossoms failed to calculate perfect matching.");
+    let mut transformed = vec![0_i128; graph.n * graph.n];
+    for (u, v, _, cost) in scaled {
+        let weight = cardinality_bonus - (cost - min_cost);
+        transformed[u * graph.n + v] = weight;
+        transformed[v * graph.n + u] = weight;
     }
 
-    #[test]
-    fn test_unmatchable_triangle() {
-        // A simple 3-node triangle. Only 1 pair can ever be made.
-        // One node must reliably be left out without crashing the implementation.
-        let n = 3;
-        let edges = vec![(0, 1), (1, 2), (2, 0)];
-
-        let graph = build_graph(n, &edges);
-        let mut matcher = FastBlossomMatching::from_graph(&graph);
-        let results = matcher.solve();
-
-        let match_count = verify_and_count_matches(results);
-        assert_eq!(match_count, 1, "Triangle should only find exactly 1 matching pair.");
-
-        // Count how many vertices were correctly identified as unmatched
-        let unmatched_count = results.iter().filter(|&&v| v == usize::MAX).count();
-        assert_eq!(unmatched_count, 1, "Exactly one node should be left unmatched.");
+    let mate = integer_blossom::max_weight_matching(&transformed, graph.n);
+    if mate.iter().any(Option::is_none) {
+        return Err("graph does not have a perfect matching".into());
     }
+    let mut edges = Vec::with_capacity(graph.n / 2);
+    for (u, partner) in mate.into_iter().enumerate() {
+        let v = partner.expect("all partners checked above");
+        if u < v {
+            edges.push(edge_for[u][v].expect("solver only matches present edges"));
+        }
+    }
+    edges.sort_unstable();
+    let total_weight = edges
+        .iter()
+        .map(|&index| graph.edges[index].weight.unwrap_or(1.0))
+        .sum();
+
+    Ok(MatchingResult {
+        edges,
+        total_weight,
+        is_perfect: true,
+        metadata: MatchingMetadata {
+            runtime_ms: start.elapsed().as_secs_f64() * 1000.0,
+            ..MatchingMetadata::default()
+        },
+    })
 }

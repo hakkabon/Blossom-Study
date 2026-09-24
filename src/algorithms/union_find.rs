@@ -11,6 +11,12 @@ pub struct UnionFind {
     value: RefCell<Vec<usize>>,
 }
 
+impl Default for UnionFind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UnionFind {
     pub fn new() -> Self {
         Self {
@@ -24,11 +30,11 @@ impl UnionFind {
         let mut parent = self.parent.borrow_mut();
         let mut rank = self.rank.borrow_mut();
         let mut value = self.value.borrow_mut();
-        
+
         parent.resize(n, 0);
         rank.resize(n, 0);
         value.resize(n, 0);
-        
+
         for i in 0..n {
             parent[i] = i;
             rank[i] = 0;
@@ -50,12 +56,14 @@ impl UnionFind {
     pub fn unite(&self, a: usize, b: usize) {
         let mut ra = self.find(a);
         let mut rb = self.find(b);
-        if ra == rb { return; }
+        if ra == rb {
+            return;
+        }
 
         // Union by rank
         let rank_a = self.rank.borrow()[ra];
         let rank_b = self.rank.borrow()[rb];
-        
+
         if rank_a < rank_b {
             std::mem::swap(&mut ra, &mut rb);
         }

@@ -1,11 +1,9 @@
 //! Blossom Algorithm Study - CLI and REPL for matching algorithms
 
-use clap::{Parser, Subcommand, ValueEnum};
 use anyhow::Result;
-use rustyline::{DefaultEditor, Result as RustylineResult};
-
-mod graph;
-mod algorithms;
+use blossom_study::{algorithms, graph};
+use clap::{Parser, Subcommand, ValueEnum};
+use rustyline::DefaultEditor;
 
 #[derive(Clone, Debug, ValueEnum)]
 enum Algorithm {
@@ -23,7 +21,7 @@ enum Algorithm {
 struct Cli {
     #[arg(short, long, value_enum, default_value = "edmonds")]
     algorithm: Algorithm,
-    
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -82,7 +80,7 @@ enum Commands {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    
+
     match cli.command {
         Commands::MaxCardinality { input, output } => {
             let graph = load_graph(&input)?;
@@ -102,23 +100,42 @@ fn main() -> Result<()> {
         }
         Commands::MinWeightPerfect { input, output } => {
             let graph = load_graph(&input)?;
-            let mut algo = algorithms::EdmondsAlgorithm::new(&graph);
-            let result = algo.min_weight_perfect(&graph).map_err(anyhow::Error::msg)?;
+            let result = match cli.algorithm {
+                Algorithm::Edmonds => {
+                    algorithms::EdmondsAlgorithm::new(&graph).min_weight_perfect(&graph)
+                }
+                Algorithm::KorteVygen => {
+                    algorithms::KorteVygenEdmonds::min_weight_perfect_matching(&graph)
+                }
+                Algorithm::FastBlossom => {
+                    algorithms::FastBlossomMatching::min_weight_perfect_matching(&graph)
+                }
+            }
+            .map_err(anyhow::Error::msg)?;
             print_result(&result, output)?;
         }
-        Commands::Generate { n, m, output, type_ } => {
+        Commands::Generate {
+            n,
+            m,
+            output,
+            type_,
+        } => {
             let graph = match type_.as_str() {
                 "complete" => graph::generator::complete_graph(n, (1.0, 100.0)),
                 "sparse" => graph::generator::random_sparse(n, m as usize, (1.0, 100.0)),
                 "grid" => {
-                    let rows = (n as f64).sqrt() as usize;
-                    let cols = (n + rows - 1) / rows;
+                    let rows = ((n as f64).sqrt() as usize).max(1);
+                    let cols = n.div_ceil(rows);
                     graph::generator::grid_graph(rows, cols, (1.0, 100.0))
                 }
                 _ => anyhow::bail!("Unknown graph type: {}", type_),
             };
             graph.to_json_file(&output)?;
-            println!("Generated graph with {} vertices and {} edges", graph.n, graph.edges.len());
+            println!(
+                "Generated graph with {} vertices and {} edges",
+                graph.n,
+                graph.edges.len()
+            );
         }
         Commands::Bench { config, output } => {
             println!("Running benchmarks...");
@@ -138,10 +155,12 @@ fn load_graph(path: &str) -> Result<graph::Graph> {
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
-    
+
     match ext.as_str() {
         "json" => graph::Graph::from_json_file(path).map_err(anyhow::Error::from),
-        "dimacs" | "dat" | "txt" => graph::Graph::from_dimacs_file(path).map_err(anyhow::Error::from),
+        "dimacs" | "dat" | "txt" => {
+            graph::Graph::from_dimacs_file(path).map_err(anyhow::Error::from)
+        }
         _ => {
             // Try JSON first, then DIMACS
             graph::Graph::from_json_file(path)
@@ -161,16 +180,18 @@ fn print_result(result: &algorithms::MatchingResult, output: Option<String>) -> 
     println!("blossoms_expanded={}", result.metadata.blossoms_expanded);
     println!("dual_updates={}", result.metadata.dual_updates);
     println!("runtime_ms={:.3}", result.metadata.runtime_ms);
-    
+
     if !result.edges.is_empty() {
         print!("edges=");
         for (i, &e) in result.edges.iter().enumerate() {
-            if i > 0 { print!(" "); }
+            if i > 0 {
+                print!(" ");
+            }
             print!("{}", e);
         }
         println!();
     }
-    
+
     if let Some(out) = output {
         std::fs::write(out, serde_json::to_string_pretty(result)?)?;
     }
@@ -182,7 +203,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
     let mut graph: Option<graph::Graph> = None;
     let mut last_result: Option<algorithms::MatchingResult> = None;
     let mut current_algorithm = initial_algorithm;
-    
+
     if let Some(path) = initial_load {
         match load_graph(&path) {
             Ok(g) => {
@@ -192,13 +213,15 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
             Err(e) => println!("Failed to load graph: {}", e),
         }
     }
-    
+
     println!("Blossom Algorithm REPL");
-    println!("Commands: load <file>, max, min, graph, edges, result, save <file>, algo <name>, quit");
+    println!(
+        "Commands: load <file>, max, min, graph, edges, result, save <file>, algo <name>, quit"
+    );
     println!("Algorithms: edmonds, korte_vygen, fast");
     println!("File formats: JSON (.json), DIMACS (.dimacs, .dat, .txt)");
     println!();
-    
+
     loop {
         let readline = rl.readline("blossom> ");
         match readline {
@@ -208,16 +231,18 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                     continue;
                 }
                 rl.add_history_entry(line)?;
-                
+
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.is_empty() {
                     continue;
                 }
-                
+
                 match parts[0] {
                     "algo" | "algorithm" => {
                         if parts.len() < 2 {
-                            println!("Usage: algo <edmonds|korte_vygen|korte-vygen|fast|fast_blossom>");
+                            println!(
+                                "Usage: algo <edmonds|korte_vygen|korte-vygen|fast|fast_blossom>"
+                            );
                             println!("Current: {:?}", current_algorithm);
                             continue;
                         }
@@ -226,7 +251,10 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                             "korte_vygen" | "korte-vygen" | "korte" | "kv" => Algorithm::KorteVygen,
                             "fast" | "fast_blossom" => Algorithm::FastBlossom,
                             _ => {
-                                println!("Unknown algorithm: {}. Use 'edmonds', 'korte_vygen', or 'fast'", parts[1]);
+                                println!(
+                                    "Unknown algorithm: {}. Use 'edmonds', 'korte_vygen', or 'fast'",
+                                    parts[1]
+                                );
                                 continue;
                             }
                         };
@@ -267,8 +295,18 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                     }
                     "min" => {
                         if let Some(ref g) = graph {
-                            let mut algo = algorithms::EdmondsAlgorithm::new(g);
-                            match algo.min_weight_perfect(g) {
+                            let result = match current_algorithm {
+                                Algorithm::Edmonds => {
+                                    algorithms::EdmondsAlgorithm::new(g).min_weight_perfect(g)
+                                }
+                                Algorithm::KorteVygen => {
+                                    algorithms::KorteVygenEdmonds::min_weight_perfect_matching(g)
+                                }
+                                Algorithm::FastBlossom => {
+                                    algorithms::FastBlossomMatching::min_weight_perfect_matching(g)
+                                }
+                            };
+                            match result {
                                 Ok(result) => {
                                     print_compact_result(&result);
                                     last_result = Some(result);
@@ -352,7 +390,9 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                         println!("  graph           - Show loaded graph info");
                         println!("  edges           - List all edges");
                         println!("  result          - Show last matching result");
-                        println!("  save <file>     - Save graph (.json/.dimacs) or result (.json)");
+                        println!(
+                            "  save <file>     - Save graph (.json/.dimacs) or result (.json)"
+                        );
                         println!("  quit / exit     - Exit REPL");
                         println!("  help            - Show this help");
                     }
@@ -383,14 +423,18 @@ fn print_compact_result(result: &algorithms::MatchingResult) {
     println!("  weight:     {:.6}", result.total_weight);
     println!("  perfect:    {}", result.is_perfect);
     println!("  iterations: {}", result.metadata.iterations);
-    println!("  blossoms:   created={}, expanded={}", 
-             result.metadata.blossoms_created, result.metadata.blossoms_expanded);
+    println!(
+        "  blossoms:   created={}, expanded={}",
+        result.metadata.blossoms_created, result.metadata.blossoms_expanded
+    );
     println!("  dual_updates: {}", result.metadata.dual_updates);
     println!("  time:       {:.3} ms", result.metadata.runtime_ms);
     if !result.edges.is_empty() {
         print!("  edges:      ");
         for (i, &e) in result.edges.iter().enumerate() {
-            if i > 0 { print!(" "); }
+            if i > 0 {
+                print!(" ");
+            }
             print!("{}", e);
         }
         println!();

@@ -13,7 +13,12 @@ blossom-study/
 │   │   └── mod.rs          # Graph representations and generators
 │   └── algorithms/
 │       ├── mod.rs          # Common types and traits
-│       └── edmonds.rs      # Edmonds' Blossom Algorithm implementation
+│       ├── edmonds.rs      # Explicit-blossom implementation
+│       ├── korte_vygen.rs  # Union-Find implementation
+│       └── fast_blossom.rs # DSU/timestamp implementation
+├── tests/
+│   ├── matching.rs         # Integration and cross-implementation tests
+│   └── data/               # Test graph fixtures
 ├── bench/
 │   └── main.rs             # Benchmark runner
 ├── Cargo.toml
@@ -31,9 +36,8 @@ blossom-study/
 
 ### Known Limitations
 - ⚠️ Nested blossom handling creates excessive blossoms in some graph types (e.g., grids)
-- ⚠️ Min-weight perfect matching (primal-dual) not fully working
-- ⚠️ No priority queue for dual variable updates (O(n) scan per iteration)
 - ⚠️ No proper handling of blocked blossoms in unweighted case
+- ⚠️ Weighted solver metadata currently reports runtime but not its internal contractions or dual updates
 
 ### Performance (Debug Build)
 | Graph | Vertices | Edges | Match Size | Time (ms) | Blossoms |
@@ -53,8 +57,8 @@ cargo run -- generate -n 20 -o graph.json
 # Maximum cardinality matching
 cargo run -- max-cardinality -i graph.json
 
-# Minimum weight perfect matching (weighted graphs only)
-cargo run -- min-weight-perfect -i graph.json
+# Minimum weight perfect matching (weighted graphs only), selecting any adapter
+cargo run -- --algorithm fast-blossom min-weight-perfect -i graph.json
 ```
 
 ### Benchmark
@@ -64,20 +68,20 @@ cargo run --bin bench
 
 ## Algorithm Details
 
-The implementation follows Gerards (1995) "Matching" chapter in Network Models, and the C++ implementation from the Minimum-Cost-Perfect-Matching repository.
+The unweighted implementations follow Gerards (1995) "Matching" and the Korte–Vygen presentation. Weighted matching uses the `integer-blossom` O(V³) primal-dual implementation. Finite `f64` costs are converted exactly to a common `i128` fixed-point representation; inputs with an exponent range too wide for `i128` are rejected explicitly.
 
 Key components:
 - **Alternating tree growth** (`grow()`) - BFS for augmenting paths
 - **Blossom contraction** (`blossom()`) - Odd cycle detection and contraction
 - **Blossom expansion** (`expand()`) - Recursive blossom dissolution
 - **Augmentation** (`augment()`) - Path flipping along augmenting paths
-- **Primal-dual updates** (`update_dual()`) - For weighted matching (WIP)
+- **Primal-dual weighted matching** - O(V³), with exact dual arithmetic and sparse-graph support
 
 ## Future Work
 
 1. **Fix nested blossom handling** - Proper blossom contraction/expansion cycle
-2. **Implement priority queue for duals** - O(log n) dual updates instead of O(n) scan
-3. **Complete min-weight perfect matching** - Full primal-dual implementation
+2. **Expose weighted-solver internals in benchmark metadata** - report contractions and dual updates
+3. **Implement priority queues for weighted dual updates** - improve practical performance
 4. **Add Blossom V/VI integration** - FFI bindings to state-of-the-art implementations
 5. **Benchmark against Blossom V/VI** - Performance comparison framework
 
