@@ -1,6 +1,7 @@
 //! Common types and traits for matching algorithms
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Result of a matching computation
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -15,9 +16,44 @@ pub struct MatchingResult {
     pub metadata: MatchingMetadata,
 }
 
+impl fmt::Display for MatchingResult {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(formatter, "matching_size={}", self.edges.len())?;
+        writeln!(formatter, "total_weight={:.6}", self.total_weight)?;
+        writeln!(formatter, "is_perfect={}", self.is_perfect)?;
+        writeln!(formatter, "iterations={}", self.metadata.iterations)?;
+        writeln!(formatter, "augmentations={}", self.metadata.augmentations)?;
+        writeln!(
+            formatter,
+            "blossoms_created={}",
+            self.metadata.blossoms_created
+        )?;
+        writeln!(
+            formatter,
+            "blossoms_expanded={}",
+            self.metadata.blossoms_expanded
+        )?;
+        writeln!(formatter, "dual_updates={}", self.metadata.dual_updates)?;
+        writeln!(formatter, "runtime_ms={:.3}", self.metadata.runtime_ms)?;
+        if !self.edges.is_empty() {
+            write!(formatter, "edges=")?;
+            for (position, edge) in self.edges.iter().enumerate() {
+                if position > 0 {
+                    write!(formatter, " ")?;
+                }
+                write!(formatter, "{edge}")?;
+            }
+            writeln!(formatter)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct MatchingMetadata {
     pub iterations: usize,
+    #[serde(default)]
+    pub augmentations: usize,
     pub blossoms_created: usize,
     pub blossoms_expanded: usize,
     pub dual_updates: usize,
@@ -33,32 +69,6 @@ pub trait MatchingAlgorithm {
     /// Minimum weight perfect matching
     fn min_weight_perfect(&mut self, graph: &crate::graph::Graph)
     -> Result<MatchingResult, String>;
-}
-
-/// Benchmark configuration
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BenchConfig {
-    pub graph_sizes: Vec<usize>,
-    pub densities: Vec<f64>,
-    pub weight_ranges: Vec<(f64, f64)>,
-    pub runs_per_config: usize,
-    pub algorithms: Vec<String>,
-}
-
-impl Default for BenchConfig {
-    fn default() -> Self {
-        Self {
-            graph_sizes: vec![10, 20, 30, 40, 50, 60, 80, 100],
-            densities: vec![0.1, 0.3, 0.5, 0.8, 1.0],
-            weight_ranges: vec![(1.0, 100.0)],
-            runs_per_config: 5,
-            algorithms: vec![
-                "edmonds".to_string(),
-                "korte_vygen".to_string(),
-                "fast_blossom".to_string(),
-            ],
-        }
-    }
 }
 
 pub mod edmonds;
@@ -89,13 +99,23 @@ impl MatchingAlgorithm for EdmondsAlgorithm {
     }
 }
 
-impl MatchingAlgorithm for KorteVygenEdmonds {
+impl MatchingAlgorithm for KorteVygenEdmonds<'_> {
     fn name(&self) -> &'static str {
         "korte_vygen"
     }
 
     fn max_cardinality(&mut self, graph: &crate::graph::Graph) -> MatchingResult {
-        Self::max_cardinality_matching(graph)
+        assert_eq!(
+            graph.n,
+            self.graph().n,
+            "solver called with a different graph size"
+        );
+        assert_eq!(
+            graph.edges,
+            self.graph().edges,
+            "solver called with different edges"
+        );
+        self.max_cardinality()
     }
 
     fn min_weight_perfect(

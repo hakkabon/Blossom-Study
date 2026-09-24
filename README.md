@@ -64,6 +64,9 @@ cargo run -- --algorithm fast-blossom min-weight-perfect -i graph.json
 ### Benchmark
 ```bash
 cargo run --bin bench
+
+# Statistically robust Criterion suite with HTML reports
+cargo bench --bench matching
 ```
 
 ## Algorithm Details

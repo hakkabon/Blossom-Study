@@ -207,25 +207,7 @@ fn print_matching_result(
         }
         println!();
     } else {
-        println!("matching_size={}", result.edges.len());
-        println!("total_weight={:.6}", result.total_weight);
-        println!("is_perfect={}", result.is_perfect);
-        println!("iterations={}", result.metadata.iterations);
-        println!("blossoms_created={}", result.metadata.blossoms_created);
-        println!("blossoms_expanded={}", result.metadata.blossoms_expanded);
-        println!("dual_updates={}", result.metadata.dual_updates);
-        println!("runtime_ms={:.3}", result.metadata.runtime_ms);
-
-        if !result.edges.is_empty() {
-            print!("edges=");
-            for (i, &e) in result.edges.iter().enumerate() {
-                if i > 0 {
-                    print!(" ");
-                }
-                print!("{}", e);
-            }
-            println!();
-        }
+        print!("{result}");
     }
 
     if let Some(out) = output {
@@ -241,7 +223,7 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
         serde_json::from_str(&content)
             .with_context(|| format!("Could not parse config file '{}'", path))?
     } else {
-        algorithms::BenchConfig::default()
+        blossom_study::benchmark::BenchConfig::default()
     };
 
     println!("Running Blossom Benchmark Suite");

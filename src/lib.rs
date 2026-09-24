@@ -4,6 +4,7 @@
 //! for maximum cardinality matching and minimum weight perfect matching.
 
 pub mod algorithms;
+pub mod benchmark;
 pub mod graph;
 
 pub use algorithms::{

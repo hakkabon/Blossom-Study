@@ -4,7 +4,6 @@ use blossom_study::{
     algorithms::{EdmondsAlgorithm, FastBlossomMatching, KorteVygenEdmonds},
     graph::generator,
 };
-use std::time::Instant;
 
 fn main() {
     println!("Blossom Algorithm Benchmark");
@@ -40,9 +39,7 @@ fn main() {
     for (name, graph) in test_cases {
         // Test Edmonds algorithm
         let mut algo1 = EdmondsAlgorithm::new(&graph);
-        let start = Instant::now();
         let result1 = algo1.max_cardinality(&graph);
-        let elapsed1 = start.elapsed().as_secs_f64() * 1000.0;
 
         println!(
             "{:<20} | {:>6} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>10}",
@@ -51,7 +48,7 @@ fn main() {
             graph.n,
             graph.edges.len(),
             result1.edges.len(),
-            elapsed1,
+            result1.metadata.runtime_ms,
             result1.metadata.blossoms_created
         );
 

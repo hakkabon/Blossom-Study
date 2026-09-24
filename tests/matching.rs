@@ -180,3 +180,17 @@ fn primal_dual_solver_matches_brute_force_oracle() {
         assert!((result.total_weight - expected).abs() < 1e-9);
     }
 }
+
+#[test]
+fn graph_json_contains_only_canonical_fields_and_rebuilds_adjacency() {
+    let graph = graph(4, &[(0, 1, 2.0), (2, 3, 3.0)]);
+    let json = serde_json::to_string(&graph).unwrap();
+    assert!(!json.contains("adj_list"));
+    assert!(!json.contains("adj_mat"));
+    assert!(!json.contains("edge_index"));
+
+    let loaded: Graph = serde_json::from_str(&json).unwrap();
+    assert_eq!(loaded.edges, graph.edges);
+    assert_eq!(loaded.adj_edges(0), &[0]);
+    assert_eq!(loaded.edge_index(2, 3), Some(1));
+}

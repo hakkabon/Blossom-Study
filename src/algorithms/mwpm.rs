@@ -33,7 +33,6 @@
 
 use crate::algorithms::{MatchingMetadata, MatchingResult};
 use crate::graph::Graph;
-use std::collections::HashMap;
 use std::time::Instant;
 
 /// Scales floating-point weights into exact 128-bit integers without precision loss.
@@ -106,7 +105,7 @@ pub struct FilteredEdge {
 
 /// Pre-filters edges: verifies finiteness, eliminates self-loops, and keeps minimum-weight parallel edges.
 pub fn filter_edges(graph: &Graph) -> Result<Vec<FilteredEdge>, String> {
-    let mut best_edges: HashMap<(usize, usize), (usize, f64)> = HashMap::new();
+    let mut candidates = Vec::with_capacity(graph.edges.len());
 
     for (index, edge) in graph.edges.iter().enumerate() {
         if edge.u >= graph.n || edge.v >= graph.n {
@@ -116,7 +115,7 @@ pub fn filter_edges(graph: &Graph) -> Result<Vec<FilteredEdge>, String> {
             ));
         }
 
-        let cost = edge.weight.unwrap_or(1.0);
+        let cost = edge.weight_or_one();
         if !cost.is_finite() {
             return Err(format!("edge {index} has a non-finite weight ({cost})"));
         }
@@ -126,32 +125,23 @@ pub fn filter_edges(graph: &Graph) -> Result<Vec<FilteredEdge>, String> {
             continue;
         }
 
-        let key = if edge.u < edge.v {
-            (edge.u, edge.v)
-        } else {
-            (edge.v, edge.u)
-        };
-
-        match best_edges.get(&key) {
-            Some(&(_, prev_cost)) if prev_cost <= cost => {}
-            _ => {
-                best_edges.insert(key, (index, cost));
-            }
-        }
-    }
-
-    let mut result: Vec<FilteredEdge> = best_edges
-        .into_iter()
-        .map(|((u, v), (original_index, weight))| FilteredEdge {
+        let (u, v) = (edge.u.min(edge.v), edge.u.max(edge.v));
+        candidates.push(FilteredEdge {
             u,
             v,
-            original_index,
-            weight,
-        })
-        .collect();
+            original_index: index,
+            weight: cost,
+        });
+    }
 
-    result.sort_by_key(|e| (e.u, e.v));
-    Ok(result)
+    candidates.sort_by(|a, b| {
+        (a.u, a.v)
+            .cmp(&(b.u, b.v))
+            .then_with(|| a.weight.total_cmp(&b.weight))
+            .then_with(|| a.original_index.cmp(&b.original_index))
+    });
+    candidates.dedup_by(|next, current| (next.u, next.v) == (current.u, current.v));
+    Ok(candidates)
 }
 
 /// Solves Minimum-Weight Perfect Matching on `graph`.
@@ -207,16 +197,10 @@ pub fn minimum_weight_perfect_matching(graph: &Graph) -> Result<MatchingResult, 
         scaled_edges.push((e.u, e.v, e.original_index, scaled_cost));
     }
 
-    let min_cost = scaled_edges
-        .iter()
-        .map(|(_, _, _, cost)| *cost)
-        .min()
-        .expect("non-empty scaled edges");
-    let max_cost = scaled_edges
-        .iter()
-        .map(|(_, _, _, cost)| *cost)
-        .max()
-        .expect("non-empty scaled edges");
+    let (min_cost, max_cost) = scaled_edges.iter().fold(
+        (i128::MAX, i128::MIN),
+        |(min_cost, max_cost), &(_, _, _, cost)| (min_cost.min(cost), max_cost.max(cost)),
+    );
 
     // Cardinality bonus ensures any perfect matching strictly dominates any non-perfect matching
     let k =
@@ -230,15 +214,11 @@ pub fn minimum_weight_perfect_matching(graph: &Graph) -> Result<MatchingResult, 
 
     // 3. Build transformed weight matrix for integer blossom solver
     let mut transformed = vec![0_i128; graph.n * graph.n];
-    let mut edge_lookup: HashMap<(usize, usize), usize> =
-        HashMap::with_capacity(scaled_edges.len());
 
-    for (u, v, original_idx, cost) in scaled_edges {
+    for (u, v, _, cost) in scaled_edges {
         let weight = cardinality_bonus - (cost - min_cost);
         transformed[u * graph.n + v] = weight;
         transformed[v * graph.n + u] = weight;
-        edge_lookup.insert((u, v), original_idx);
-        edge_lookup.insert((v, u), original_idx);
     }
 
     // 4. Solve maximum weight matching via integer_blossom
@@ -258,11 +238,10 @@ pub fn minimum_weight_perfect_matching(graph: &Graph) -> Result<MatchingResult, 
     for (u, partner) in mate.into_iter().enumerate() {
         let v = partner.expect("all partners verified");
         if u < v {
-            let edge_idx = edge_lookup
-                .get(&(u, v))
-                .copied()
-                .ok_or_else(|| format!("internal error: matched edge ({u}, {v}) not in lookup"))?;
-            matched_edges.push(edge_idx);
+            let position = filtered_edges
+                .binary_search_by_key(&(u, v), |edge| (edge.u, edge.v))
+                .map_err(|_| format!("internal error: matched edge ({u}, {v}) not found"))?;
+            matched_edges.push(filtered_edges[position].original_index);
         }
     }
 
@@ -270,7 +249,7 @@ pub fn minimum_weight_perfect_matching(graph: &Graph) -> Result<MatchingResult, 
 
     let total_weight: f64 = matched_edges
         .iter()
-        .map(|&idx| graph.edges[idx].weight.unwrap_or(1.0))
+        .map(|&idx| graph.edges[idx].weight_or_one())
         .sum();
 
     Ok(MatchingResult {
@@ -279,6 +258,7 @@ pub fn minimum_weight_perfect_matching(graph: &Graph) -> Result<MatchingResult, 
         is_perfect: true,
         metadata: MatchingMetadata {
             iterations: 0,
+            augmentations: graph.n / 2,
             blossoms_created: 0,
             blossoms_expanded: 0,
             dual_updates: 0,

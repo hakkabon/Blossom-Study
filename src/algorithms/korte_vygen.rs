@@ -38,8 +38,8 @@ enum VertexType {
 }
 
 /// Korte-Vygen Edmonds Blossom Algorithm for Maximum Cardinality Matching
-pub struct KorteVygenEdmonds {
-    graph: Graph,
+pub struct KorteVygenEdmonds<'a> {
+    graph: &'a Graph,
 
     // mu mapping: matching partner (mu[v] == v means unmatched)
     mu: Vec<usize>,
@@ -71,12 +71,16 @@ pub struct KorteVygenEdmonds {
     blossoms_expanded: usize,
 }
 
-impl KorteVygenEdmonds {
+impl<'a> KorteVygenEdmonds<'a> {
+    pub(crate) fn graph(&self) -> &Graph {
+        self.graph
+    }
+
     /// Creates a new solver initialized with `graph`
-    pub fn new(graph: &Graph) -> Self {
+    pub fn new(graph: &'a Graph) -> Self {
         let n = graph.n;
         Self {
-            graph: graph.clone(),
+            graph,
             mu: vec![0; n],
             phi: vec![0; n],
             outer_vertices: VecDeque::new(),
@@ -137,7 +141,7 @@ impl KorteVygenEdmonds {
         None
     }
 
-    fn neighbor_search(&self, x: usize) -> Option<(usize, VertexType)> {
+    fn neighbor_search(&mut self, x: usize) -> Option<(usize, VertexType)> {
         let x_rho = self.rho.find(x);
 
         for &edge_idx in &self.graph.adj_list[x] {
@@ -285,7 +289,8 @@ impl KorteVygenEdmonds {
 
                 // Our matching partner is surely not part of a blossom
                 // => it is its own representant => also merge it
-                self.rho.unite(r, self.mu[v]);
+                let mate = self.mu[v];
+                self.rho.unite(r, mate);
             }
 
             v = self.phi[self.mu[v]];
@@ -458,7 +463,7 @@ impl KorteVygenEdmonds {
         let edge_count = edges.len();
         let total_weight = edges
             .iter()
-            .map(|&i| self.graph.edges[i].weight.unwrap_or(1.0))
+            .map(|&i| self.graph.edges[i].weight_or_one())
             .sum();
 
         MatchingResult {
@@ -467,6 +472,7 @@ impl KorteVygenEdmonds {
             is_perfect: edge_count * 2 == self.n,
             metadata: MatchingMetadata {
                 iterations: self.iterations,
+                augmentations: edge_count,
                 blossoms_created: self.blossoms_created,
                 blossoms_expanded: self.blossoms_expanded,
                 dual_updates: 0,
@@ -481,9 +487,9 @@ impl KorteVygenEdmonds {
     }
 }
 
-impl KorteVygenEdmonds {
+impl<'a> KorteVygenEdmonds<'a> {
     /// Computes maximum cardinality matching on `graph`
-    pub fn max_cardinality_matching(graph: &Graph) -> MatchingResult {
+    pub fn max_cardinality_matching(graph: &'a Graph) -> MatchingResult {
         let mut algo = Self::new(graph);
         algo.max_cardinality()
     }

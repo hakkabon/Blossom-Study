@@ -1,10 +1,10 @@
 //! Graph representations for matching algorithms
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::io;
 
 /// Edge with optional weight
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Edge {
     pub u: usize,
     pub v: usize,
@@ -15,44 +15,49 @@ impl Edge {
     pub fn new(u: usize, v: usize, weight: Option<f64>) -> Self {
         Self { u, v, weight }
     }
+
+    #[inline]
+    pub fn weight_or_one(&self) -> f64 {
+        self.weight.unwrap_or(1.0)
+    }
 }
 
 /// Graph representation supporting both dense and sparse formats
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Graph {
     pub n: usize,
     pub edges: Vec<Edge>,
     // Dense adjacency matrix for O(1) edge lookups
+    #[serde(skip)]
     pub adj_mat: Option<Vec<Vec<bool>>>,
     // Adjacency lists for sparse iteration
+    #[serde(skip)]
     pub adj_list: Vec<Vec<usize>>,
     // Edge index lookup: (u, v) -> edge index
+    #[serde(skip)]
     pub edge_index: Option<Vec<Vec<usize>>>,
 }
 
+impl<'de> Deserialize<'de> for Graph {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct StoredGraph {
+            n: usize,
+            edges: Vec<Edge>,
+        }
+
+        let stored = StoredGraph::deserialize(deserializer)?;
+        Ok(Graph::from_edges(stored.n, stored.edges))
+    }
+}
+
 impl Graph {
-    /// Create from edge list (sparse)
+    /// Create from an edge list using sparse derived structures.
     pub fn from_edges(n: usize, edges: Vec<Edge>) -> Self {
-        let mut adj_list = vec![Vec::new(); n];
-        let mut adj_mat = vec![vec![false; n]; n];
-        let mut edge_index = vec![vec![usize::MAX; n]; n];
-
-        for (idx, e) in edges.iter().enumerate() {
-            adj_list[e.u].push(idx);
-            adj_list[e.v].push(idx);
-            adj_mat[e.u][e.v] = true;
-            adj_mat[e.v][e.u] = true;
-            edge_index[e.u][e.v] = idx;
-            edge_index[e.v][e.u] = idx;
-        }
-
-        Self {
-            n,
-            edges,
-            adj_mat: Some(adj_mat),
-            adj_list,
-            edge_index: Some(edge_index),
-        }
+        Self::from_edges_sparse(n, edges)
     }
 
     /// Create from edge list without dense matrix (for large graphs)
@@ -76,19 +81,23 @@ impl Graph {
     }
 
     pub fn edge_index(&self, u: usize, v: usize) -> Option<usize> {
-        self.edge_index
-            .as_ref()
-            .map(|ei| ei[u][v])
-            .filter(|&i| i != usize::MAX)
+        if u >= self.n || v >= self.n {
+            return None;
+        }
+        if let Some(index) = &self.edge_index {
+            return (index[u][v] != usize::MAX).then_some(index[u][v]);
+        }
+        self.adj_list[u].iter().copied().find(|&index| {
+            let edge = &self.edges[index];
+            (edge.u == u && edge.v == v) || (edge.u == v && edge.v == u)
+        })
     }
 
     pub fn is_adjacent(&self, u: usize, v: usize) -> bool {
         if let Some(am) = &self.adj_mat {
             am[u][v]
         } else {
-            self.edges
-                .iter()
-                .any(|e| (e.u == u && e.v == v) || (e.u == v && e.v == u))
+            self.edge_index(u, v).is_some()
         }
     }
 

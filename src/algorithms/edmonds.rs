@@ -24,8 +24,6 @@ pub struct EdmondsAlgorithm {
     m: usize,
     edges: Vec<Edge>,
     adj_list: Vec<Vec<usize>>,
-    adj_mat: Vec<Vec<bool>>,
-    edge_index: Vec<Vec<usize>>,
     edge_weights: Vec<f64>,
 
     // Blossom tracking
@@ -76,19 +74,13 @@ impl EdmondsAlgorithm {
 
         // Build adjacency structures
         let mut adj_list = vec![Vec::new(); n];
-        let mut adj_mat = vec![vec![false; n]; n];
-        let mut edge_index = vec![vec![usize::MAX; n]; n];
         let mut edge_weights = vec![0.0; m];
 
         for (idx, e) in graph.edges.iter().enumerate() {
             if e.u < n && e.v < n {
                 adj_list[e.u].push(idx);
                 adj_list[e.v].push(idx);
-                adj_mat[e.u][e.v] = true;
-                adj_mat[e.v][e.u] = true;
-                edge_index[e.u][e.v] = idx;
-                edge_index[e.v][e.u] = idx;
-                edge_weights[idx] = e.weight.unwrap_or(1.0);
+                edge_weights[idx] = e.weight_or_one();
             }
         }
 
@@ -97,8 +89,6 @@ impl EdmondsAlgorithm {
             m,
             edges: graph.edges.clone(),
             adj_list,
-            adj_mat,
-            edge_index,
             edge_weights,
             outer: vec![0; max_vertices],
             deep: vec![Vec::new(); max_vertices],
@@ -204,34 +194,13 @@ impl EdmondsAlgorithm {
         greater(self.slack[idx], 0.0)
     }
 
-    #[inline]
-    fn is_edge_blocked(&self, u: usize, v: usize) -> bool {
-        let idx = self.edge_index[u][v];
-        if idx != usize::MAX {
-            self.is_edge_blocked_idx(idx)
-        } else {
-            true
-        }
-    }
-
-    #[inline]
-    fn is_adjacent(&self, u: usize, v: usize) -> bool {
-        self.adj_mat[u][v] && !self.is_edge_blocked(u, v)
-    }
-
     /// Grows the alternating forest and performs augmentations or blossom contractions.
     /// Returns `true` if an augmenting path was found during this stage.
     fn grow(&mut self) -> bool {
         self.reset_state();
-        let max_iter = self.n.max(50) * 20;
-        let mut loop_count = 0;
         let mut augmented = false;
 
         'bfs: while let Some(v) = self.queue.pop_front() {
-            if loop_count > max_iter {
-                break;
-            }
-            loop_count += 1;
             self.iterations += 1;
 
             let w = self.outer[v];
@@ -400,15 +369,18 @@ impl EdmondsAlgorithm {
         let mut p = usize::MAX;
         let mut q = usize::MAX;
 
+        let mut in_v = vec![false; self.n];
+        for &vertex in &self.deep[v] {
+            in_v[vertex] = true;
+        }
         for &di in &self.deep[u] {
-            for &dj in &self.deep[v] {
-                if self.is_adjacent(di, dj) {
-                    let idx = self.edge_index[di][dj];
-                    if idx < min_idx {
-                        min_idx = idx;
-                        p = di;
-                        q = dj;
-                    }
+            for &idx in &self.adj_list[di] {
+                let edge = &self.edges[idx];
+                let dj = if edge.u == di { edge.v } else { edge.u };
+                if in_v[dj] && !self.is_edge_blocked_idx(idx) && idx < min_idx {
+                    min_idx = idx;
+                    p = di;
+                    q = dj;
                 }
             }
         }
@@ -547,7 +519,12 @@ impl EdmondsAlgorithm {
     }
 
     /// Computes maximum cardinality matching on the graph.
-    pub fn max_cardinality(&mut self, _graph: &Graph) -> MatchingResult {
+    pub fn max_cardinality(&mut self, graph: &Graph) -> MatchingResult {
+        assert_eq!(graph.n, self.n, "solver called with a different graph size");
+        assert_eq!(
+            graph.edges, self.edges,
+            "solver called with different edges"
+        );
         let start = std::time::Instant::now();
         self.clear_all();
 
@@ -562,6 +539,7 @@ impl EdmondsAlgorithm {
         }
 
         let edges = self.retrieve_matching();
+        let augmentations = edges.len();
         let total_weight: f64 = edges.iter().map(|&i| self.edge_weights[i]).sum();
         let is_perfect = edges.len() * 2 == self.n;
 
@@ -571,6 +549,7 @@ impl EdmondsAlgorithm {
             is_perfect,
             metadata: MatchingMetadata {
                 iterations: self.iterations,
+                augmentations,
                 blossoms_created: self.blossoms_created,
                 blossoms_expanded: self.blossoms_expanded,
                 dual_updates: self.dual_updates,

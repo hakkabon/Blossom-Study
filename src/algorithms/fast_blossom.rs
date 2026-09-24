@@ -89,7 +89,7 @@ pub struct FastBlossomMatching {
     // Execution metrics
     iterations: usize,
     blossoms_created: usize,
-    blossoms_expanded: usize,
+    augmentations: usize,
 }
 
 impl FastBlossomMatching {
@@ -107,7 +107,7 @@ impl FastBlossomMatching {
             vis_token: 0,
             iterations: 0,
             blossoms_created: 0,
-            blossoms_expanded: 0,
+            augmentations: 0,
         }
     }
 
@@ -238,7 +238,7 @@ impl FastBlossomMatching {
                         self.match_pair[curr_p] = end_node;
                         end_node = next_node;
                     }
-                    self.blossoms_expanded += 1;
+                    self.augmentations += 1;
                 }
             }
         }
@@ -273,10 +273,7 @@ impl FastBlossomMatching {
         }
 
         let edge_count = edges.len();
-        let total_weight = edges
-            .iter()
-            .map(|&i| graph.edges[i].weight.unwrap_or(1.0))
-            .sum();
+        let total_weight = edges.iter().map(|&i| graph.edges[i].weight_or_one()).sum();
 
         MatchingResult {
             edges,
@@ -284,8 +281,9 @@ impl FastBlossomMatching {
             is_perfect: edge_count * 2 == matcher.n,
             metadata: MatchingMetadata {
                 iterations: matcher.iterations,
+                augmentations: matcher.augmentations,
                 blossoms_created: matcher.blossoms_created,
-                blossoms_expanded: matcher.blossoms_expanded,
+                blossoms_expanded: 0,
                 dual_updates: 0,
                 runtime_ms: start.elapsed().as_secs_f64() * 1000.0,
             },

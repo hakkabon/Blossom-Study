@@ -104,9 +104,11 @@ fn test_all_algorithms_track_telemetry() {
 
     // Iterations should be measured for all algorithms
     assert!(res_edmonds.metadata.iterations > 0);
-    assert!(res_kv.metadata.iterations > 0,
+    assert!(
+        res_kv.metadata.iterations > 0,
         "KV iterations should be > 0 (includes greedy phase), got {}",
-        res_kv.metadata.iterations);
+        res_kv.metadata.iterations
+    );
     assert!(res_fast.metadata.iterations > 0);
 
     // Blossoms created: Edmonds and FastBlossom must contract the pentagon.
@@ -114,10 +116,14 @@ fn test_all_algorithms_track_telemetry() {
     // so it matches the degree-1 tail vertex (5→0) first and then pairs the
     // remaining 4-cycle vertices — a perfect matching with no BFS required.
     // blossoms_created == 0 is the correct observed value for KV here.
-    assert!(res_edmonds.metadata.blossoms_created > 0,
-        "Edmonds must create a blossom on the pentagon+tail");
-    assert!(res_fast.metadata.blossoms_created > 0,
-        "FastBlossom must create a blossom on the pentagon+tail");
+    assert!(
+        res_edmonds.metadata.blossoms_created > 0,
+        "Edmonds must create a blossom on the pentagon+tail"
+    );
+    assert!(
+        res_fast.metadata.blossoms_created > 0,
+        "FastBlossom must create a blossom on the pentagon+tail"
+    );
 
     // KV telemetry fields are properly initialised (valid usize / f64)
     let _ = res_kv.metadata.blossoms_created;
@@ -160,7 +166,11 @@ fn test_kv_blossom_telemetry_on_forced_contraction() {
     );
 
     let res_kv = KorteVygenEdmonds::max_cardinality_matching(&graph);
-    assert_eq!(res_kv.edges.len(), 3, "should find a 3-edge perfect matching");
+    assert_eq!(
+        res_kv.edges.len(),
+        3,
+        "should find a 3-edge perfect matching"
+    );
     assert!(res_kv.is_perfect, "matching should be perfect");
     assert!(
         res_kv.metadata.iterations > 0,
