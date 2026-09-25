@@ -50,6 +50,7 @@ impl Algorithm {
 #[derive(Parser)]
 #[command(name = "blossom_study")]
 #[command(about = "Benchmark and test Edmonds' Blossom Algorithm implementations")]
+#[command(version)]
 struct Cli {
     #[arg(short, long, value_enum, default_value = "edmonds")]
     algorithm: Algorithm,

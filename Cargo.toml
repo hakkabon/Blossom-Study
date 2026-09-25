@@ -2,6 +2,7 @@
 name = "blossom_study"
 version = "0.1.0"
 edition = "2024"
+default-run = "blossom_study"
 
 [lib]
 name = "blossom_study"

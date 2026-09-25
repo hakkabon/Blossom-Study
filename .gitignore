@@ -5,9 +5,8 @@
 **/target/
 **/target-*/
 
-# Cargo locks and local config overrides
+# Cargo local config overrides
 **/*.rs.bk
-Cargo.lock
 
 # Swift
 /swift/.build/
