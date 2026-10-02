@@ -69,10 +69,4 @@ impl UnionFind {
         self.parent[v] = v;
         self.rank[v] = 0;
     }
-
-    pub fn dissolve(&mut self, values: &[usize]) {
-        for &val in values {
-            self.fast_disconnect_element(val);
-        }
-    }
 }

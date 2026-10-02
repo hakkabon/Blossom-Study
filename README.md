@@ -1,6 +1,6 @@
 # Blossom Algorithm Study
 
-A Rust project for studying and benchmarking Edmonds' Blossom Algorithm implementations for maximum cardinality matching and minimum weight perfect matching.
+A Rust project for studying maximum-cardinality and minimum-weight perfect matching algorithms.
 
 ## Project Structure
 
@@ -13,9 +13,10 @@ blossom-study/
 │   │   └── mod.rs          # Graph representations and generators
 │   └── algorithms/
 │       ├── mod.rs          # Common types and traits
-│       ├── edmonds.rs      # Explicit-blossom implementation
-│       ├── korte_vygen.rs  # Union-Find implementation
-│       └── fast_blossom.rs # DSU/timestamp implementation
+│       ├── fast_blossom.rs # Active conventional cardinality baseline
+│       ├── micali_vazirani.rs # Experimental phase-based scaffold
+│       ├── mwpm.rs         # Active weighted primal-dual solver adapter
+│       └── korte_vygen.rs  # Reference-only implementation
 ├── tests/
 │   ├── matching.rs         # Integration and cross-implementation tests
 │   └── data/               # Test graph fixtures
@@ -28,15 +29,16 @@ blossom-study/
 ## Current Status
 
 ### Working Features
-- ✅ Maximum cardinality matching (Edmonds' Blossom Algorithm)
+- ✅ Maximum cardinality matching (`fast-blossom`)
+- 🚧 Micali–Vazirani state and phase scaffold
+- ✅ O(V³) minimum-weight perfect matching
 - ✅ Graph generation (complete, sparse, grid)
 - ✅ JSON serialization for graphs
 - ✅ Benchmark framework
-- ✅ Basic blossom contraction/expansion
+- ✅ Criterion and CLI benchmark frameworks
 
 ### Known Limitations
-- ⚠️ Nested blossom handling creates excessive blossoms in some graph types (e.g., grids)
-- ⚠️ No proper handling of blocked blossoms in unweighted case
+- ⚠️ Micali–Vazirani level search, bridge processing, petals, and augmentation are not implemented yet
 - ⚠️ Weighted solver metadata currently reports runtime but not its internal contractions or dual updates
 
 ### Performance (Debug Build)
@@ -57,8 +59,8 @@ cargo run -- generate -n 20 -o graph.json
 # Maximum cardinality matching
 cargo run -- max-cardinality -i graph.json
 
-# Minimum weight perfect matching (weighted graphs only), selecting any adapter
-cargo run -- --algorithm fast-blossom min-weight-perfect -i graph.json
+# Minimum weight perfect matching (weighted graphs only)
+cargo run -- min-weight-perfect -i graph.json
 ```
 
 ### Benchmark
@@ -71,22 +73,20 @@ cargo bench --bench matching
 
 ## Algorithm Details
 
-The unweighted implementations follow Gerards (1995) "Matching" and the Korte–Vygen presentation. Weighted matching uses the `integer-blossom` O(V³) primal-dual implementation. Finite `f64` costs are converted exactly to a common `i128` fixed-point representation; inputs with an exponent range too wide for `i128` are rejected explicitly.
+Fast Blossom is the active conventional unweighted baseline. Korte–Vygen is retained under `algorithms::reference` for study but is excluded from normal benchmarks. The former explicit-blossom implementation is retired from the public API. Weighted matching uses the `integer-blossom` O(V³) primal-dual implementation. Finite `f64` costs are converted exactly to a common `i128` fixed-point representation; inputs with an exponent range too wide for `i128` are rejected explicitly.
 
 Key components:
-- **Alternating tree growth** (`grow()`) - BFS for augmenting paths
-- **Blossom contraction** (`blossom()`) - Odd cycle detection and contraction
-- **Blossom expansion** (`expand()`) - Recursive blossom dissolution
-- **Augmentation** (`augment()`) - Path flipping along augmenting paths
+- **Fast Blossom** - DSU contraction with timestamp-based LCA
+- **Micali–Vazirani scaffold** - explicit phases, MIN/MAX levels, predecessors, bridges, and petal bases
 - **Primal-dual weighted matching** - O(V³), with exact dual arithmetic and sparse-graph support
 
 ## Future Work
 
-1. **Fix nested blossom handling** - Proper blossom contraction/expansion cycle
-2. **Expose weighted-solver internals in benchmark metadata** - report contractions and dual updates
-3. **Implement priority queues for weighted dual updates** - improve practical performance
-4. **Add Blossom V/VI integration** - FFI bindings to state-of-the-art implementations
-5. **Benchmark against Blossom V/VI** - Performance comparison framework
+1. **Implement Micali–Vazirani level search** - BFS levels and tenacity
+2. **Implement bridge processing and petals** - set-merging support
+3. **Implement phase augmentation** - maximal set of vertex-disjoint shortest augmenting paths
+4. **Add external Blossom V/VI benchmark adapters** - executables remain outside this repository
+5. **Expose weighted-solver internals** - report contractions and dual updates
 
 ## References
 

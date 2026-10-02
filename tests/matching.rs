@@ -1,6 +1,4 @@
-use blossom_study::algorithms::{
-    EdmondsAlgorithm, FastBlossomMatching, KorteVygenEdmonds, MatchingResult,
-};
+use blossom_study::algorithms::{FastBlossomMatching, MatchingResult};
 use blossom_study::graph::{Edge, Graph};
 
 fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
@@ -65,7 +63,7 @@ fn fast_blossom_handles_nested_blossoms() {
 }
 
 #[test]
-fn all_algorithms_find_the_same_minimum_weight() {
+fn weighted_solver_finds_the_minimum_weight() {
     let graph = graph(
         6,
         &[
@@ -87,23 +85,15 @@ fn all_algorithms_find_the_same_minimum_weight() {
         ],
     );
 
-    let results = [
-        EdmondsAlgorithm::new(&graph)
-            .min_weight_perfect(&graph)
-            .unwrap(),
-        KorteVygenEdmonds::min_weight_perfect_matching(&graph).unwrap(),
-        FastBlossomMatching::min_weight_perfect_matching(&graph).unwrap(),
-    ];
-    for result in &results {
-        assert_valid(&graph, result);
-        assert_eq!(result.total_weight, 6.0);
-    }
+    let result = blossom_study::minimum_weight_perfect_matching(&graph).unwrap();
+    assert_valid(&graph, &result);
+    assert_eq!(result.total_weight, 6.0);
 }
 
 #[test]
 fn minimum_weight_reports_impossible_graphs() {
     let graph = graph(4, &[(0, 1, 1.0), (1, 2, 1.0), (2, 0, 1.0)]);
-    assert!(FastBlossomMatching::min_weight_perfect_matching(&graph).is_err());
+    assert!(blossom_study::minimum_weight_perfect_matching(&graph).is_err());
 }
 
 #[test]
@@ -118,7 +108,7 @@ fn minimum_weight_supports_negative_and_parallel_edges() {
             (1, 3, 10.0),
         ],
     );
-    let result = FastBlossomMatching::min_weight_perfect_matching(&graph).unwrap();
+    let result = blossom_study::minimum_weight_perfect_matching(&graph).unwrap();
     assert_valid(&graph, &result);
     assert_eq!(result.total_weight, -7.0);
     assert!(result.edges.contains(&1));
@@ -135,7 +125,7 @@ fn polynomial_solver_handles_more_than_twenty_four_vertices() {
         }
     }
     let graph = graph(n, &edges);
-    let result = FastBlossomMatching::min_weight_perfect_matching(&graph).unwrap();
+    let result = blossom_study::minimum_weight_perfect_matching(&graph).unwrap();
     assert_valid(&graph, &result);
     assert_eq!(result.total_weight, 15.0);
 }
@@ -175,7 +165,7 @@ fn primal_dual_solver_matches_brute_force_oracle() {
             costs[v][u] = weight;
         }
         let graph = graph(n, &edges);
-        let result = FastBlossomMatching::min_weight_perfect_matching(&graph).unwrap();
+        let result = blossom_study::minimum_weight_perfect_matching(&graph).unwrap();
         let expected = brute_force(&costs, (1 << n) - 1);
         assert!((result.total_weight - expected).abs() < 1e-9);
     }

@@ -18,11 +18,7 @@ impl Default for BenchConfig {
             densities: vec![0.1, 0.3, 0.5, 0.8, 1.0],
             weight_ranges: vec![(1.0, 100.0)],
             runs_per_config: 5,
-            algorithms: vec![
-                "edmonds".to_string(),
-                "korte_vygen".to_string(),
-                "fast_blossom".to_string(),
-            ],
+            algorithms: vec!["fast_blossom".to_string()],
         }
     }
 }

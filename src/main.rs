@@ -7,52 +7,39 @@ use rustyline::DefaultEditor;
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum Algorithm {
-    /// Original Edmonds implementation
-    Edmonds,
-    /// Korte-Vygen implementation (Union-Find based)
-    KorteVygen,
     /// Fast Blossom (DSU with timestamp LCA)
     FastBlossom,
+    /// Experimental Micali–Vazirani scaffold
+    MicaliVazirani,
 }
 
 impl Algorithm {
-    pub fn max_cardinality(&self, graph: &graph::Graph) -> algorithms::MatchingResult {
-        match self {
-            Algorithm::Edmonds => {
-                let mut algo = algorithms::EdmondsAlgorithm::new(graph);
-                algo.max_cardinality(graph)
-            }
-            Algorithm::KorteVygen => algorithms::KorteVygenEdmonds::max_cardinality_matching(graph),
-            Algorithm::FastBlossom => {
-                algorithms::FastBlossomMatching::max_cardinality_matching(graph)
-            }
-        }
-    }
-
-    pub fn min_weight_perfect(
+    pub fn max_cardinality(
         &self,
         graph: &graph::Graph,
     ) -> Result<algorithms::MatchingResult, String> {
         match self {
-            Algorithm::Edmonds => {
-                algorithms::EdmondsAlgorithm::new(graph).min_weight_perfect(graph)
-            }
-            Algorithm::KorteVygen => {
-                algorithms::KorteVygenEdmonds::min_weight_perfect_matching(graph)
-            }
-            Algorithm::FastBlossom => {
-                algorithms::FastBlossomMatching::min_weight_perfect_matching(graph)
-            }
+            Algorithm::FastBlossom => Ok(
+                algorithms::FastBlossomMatching::max_cardinality_matching(graph),
+            ),
+            Algorithm::MicaliVazirani => algorithms::MicaliVazirani::new(graph)
+                .max_cardinality_matching(graph)
+                .map_err(|error| error.to_string()),
         }
+    }
+
+    pub fn min_weight_perfect(graph: &graph::Graph) -> Result<algorithms::MatchingResult, String> {
+        algorithms::minimum_weight_perfect_matching(graph)
     }
 }
 
 #[derive(Parser)]
 #[command(name = "blossom_study")]
-#[command(about = "Benchmark and test Edmonds' Blossom Algorithm implementations")]
+#[command(about = "Study and benchmark general-graph matching algorithms")]
 #[command(version)]
 struct Cli {
-    #[arg(short, long, value_enum, default_value = "edmonds")]
+    /// Cardinality solver (the weighted command always uses the primal-dual solver)
+    #[arg(short, long, value_enum, default_value = "fast-blossom")]
     algorithm: Algorithm,
 
     #[command(subcommand)]
@@ -117,15 +104,15 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::MaxCardinality { input, output } => {
             let graph = load_graph(&input)?;
-            let result = cli.algorithm.max_cardinality(&graph);
+            let result = cli
+                .algorithm
+                .max_cardinality(&graph)
+                .map_err(anyhow::Error::msg)?;
             print_matching_result(&result, output.as_deref(), false)?;
         }
         Commands::MinWeightPerfect { input, output } => {
             let graph = load_graph(&input)?;
-            let result = cli
-                .algorithm
-                .min_weight_perfect(&graph)
-                .map_err(anyhow::Error::msg)?;
+            let result = Algorithm::min_weight_perfect(&graph).map_err(anyhow::Error::msg)?;
             print_matching_result(&result, output.as_deref(), false)?;
         }
         Commands::Generate {
@@ -258,13 +245,14 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
 
             for algo_name in &config.algorithms {
                 let algo = match algo_name.to_lowercase().as_str() {
-                    "edmonds" => Algorithm::Edmonds,
-                    "korte_vygen" | "kv" => Algorithm::KorteVygen,
                     "fast_blossom" | "fast" => Algorithm::FastBlossom,
+                    "micali_vazirani" | "mv" => Algorithm::MicaliVazirani,
                     _ => continue,
                 };
 
-                let res = algo.max_cardinality(&graph);
+                let Ok(res) = algo.max_cardinality(&graph) else {
+                    continue;
+                };
 
                 println!(
                     "{:<15} | {:>6} | {:>8} | {:>10.2} | {:>8} | {:>10.3} | {:>8}",
@@ -314,7 +302,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
     println!(
         "Commands: load <file>, max, min, graph, edges, result, save <file>, algo <name>, quit"
     );
-    println!("Algorithms: edmonds, korte_vygen, fast");
+    println!("Algorithms: fast_blossom, micali_vazirani (scaffold)");
     println!("File formats: JSON (.json), DIMACS (.dimacs, .dat, .txt)");
     println!();
 
@@ -336,19 +324,18 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                 match parts[0] {
                     "algo" | "algorithm" => {
                         if parts.len() < 2 {
-                            println!(
-                                "Usage: algo <edmonds|korte_vygen|korte-vygen|fast|fast_blossom>"
-                            );
+                            println!("Usage: algo <fast_blossom|micali_vazirani>");
                             println!("Current: {:?}", current_algorithm);
                             continue;
                         }
                         current_algorithm = match parts[1].to_lowercase().as_str() {
-                            "edmonds" => Algorithm::Edmonds,
-                            "korte_vygen" | "korte-vygen" | "korte" | "kv" => Algorithm::KorteVygen,
                             "fast" | "fast_blossom" => Algorithm::FastBlossom,
+                            "mv" | "micali_vazirani" | "micali-vazirani" => {
+                                Algorithm::MicaliVazirani
+                            }
                             _ => {
                                 println!(
-                                    "Unknown algorithm: {}. Use 'edmonds', 'korte_vygen', or 'fast'",
+                                    "Unknown algorithm: {}. Use 'fast_blossom' or 'micali_vazirani'",
                                     parts[1]
                                 );
                                 continue;
@@ -371,16 +358,20 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                     }
                     "max" => {
                         if let Some(ref g) = graph {
-                            let result = current_algorithm.max_cardinality(g);
-                            print_matching_result(&result, None, true)?;
-                            last_result = Some(result);
+                            match current_algorithm.max_cardinality(g) {
+                                Ok(result) => {
+                                    print_matching_result(&result, None, true)?;
+                                    last_result = Some(result);
+                                }
+                                Err(error) => println!("Error: {error}"),
+                            }
                         } else {
                             println!("No graph loaded. Use 'load <file>' first.");
                         }
                     }
                     "min" => {
                         if let Some(ref g) = graph {
-                            match current_algorithm.min_weight_perfect(g) {
+                            match Algorithm::min_weight_perfect(g) {
                                 Ok(result) => {
                                     print_matching_result(&result, None, true)?;
                                     last_result = Some(result);

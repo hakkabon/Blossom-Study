@@ -1,8 +1,5 @@
+use blossom_study::algorithms::minimum_weight_perfect_matching;
 use blossom_study::algorithms::mwpm::{WeightScaler, filter_edges};
-use blossom_study::algorithms::{
-    EdmondsAlgorithm, FastBlossomMatching, KorteVygenEdmonds, MatchingAlgorithm,
-    minimum_weight_perfect_matching,
-};
 use blossom_study::graph::{Edge, Graph};
 
 fn make_graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
@@ -91,7 +88,7 @@ fn test_mwpm_diagnostics_on_non_finite_weight() {
 }
 
 #[test]
-fn test_matching_algorithm_trait_dispatch() {
+fn test_weighted_solver_public_entry_point() {
     let graph = make_graph(
         4,
         &[
@@ -104,25 +101,8 @@ fn test_matching_algorithm_trait_dispatch() {
         ],
     );
 
-    let mut algorithms: Vec<Box<dyn MatchingAlgorithm>> = vec![
-        Box::new(EdmondsAlgorithm::new(&graph)),
-        Box::new(KorteVygenEdmonds::new(&graph)),
-        Box::new(FastBlossomMatching::from_graph(&graph)),
-    ];
-
-    for algo in &mut algorithms {
-        let name = algo.name();
-        let max_res = algo.max_cardinality(&graph);
-        assert_eq!(max_res.edges.len(), 2, "max cardinality failed for {name}");
-        assert!(max_res.is_perfect, "expected perfect matching for {name}");
-
-        let min_res = algo
-            .min_weight_perfect(&graph)
-            .unwrap_or_else(|e| panic!("MWPM failed for {name}: {e}"));
-        assert_eq!(min_res.edges.len(), 2, "mwpm size mismatch for {name}");
-        // Optimal edges are (1,2) with w=1 and (3,0) with w=2 => total = 3.0
-        // Or (0,1) with w=3 and (2,3) with w=4 => total = 7.0
-        // Best is 3.0
-        assert_eq!(min_res.total_weight, 3.0, "MWPM weight mismatch for {name}");
-    }
+    let result = minimum_weight_perfect_matching(&graph).expect("MWPM should succeed");
+    assert_eq!(result.edges.len(), 2);
+    assert!(result.is_perfect);
+    assert_eq!(result.total_weight, 3.0);
 }

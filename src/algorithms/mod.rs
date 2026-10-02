@@ -60,85 +60,17 @@ pub struct MatchingMetadata {
     pub runtime_ms: f64,
 }
 
-/// Trait for matching algorithms
-pub trait MatchingAlgorithm {
-    /// Name identifier of the algorithm
-    fn name(&self) -> &'static str;
-    /// Maximum cardinality matching
-    fn max_cardinality(&mut self, graph: &crate::graph::Graph) -> MatchingResult;
-    /// Minimum weight perfect matching
-    fn min_weight_perfect(&mut self, graph: &crate::graph::Graph)
-    -> Result<MatchingResult, String>;
-}
-
-pub mod edmonds;
 pub mod fast_blossom;
-pub mod korte_vygen;
+mod korte_vygen;
+pub mod micali_vazirani;
 pub mod mwpm;
-pub mod union_find;
+mod union_find;
 
-pub use edmonds::EdmondsAlgorithm;
 pub use fast_blossom::FastBlossomMatching;
-pub use korte_vygen::KorteVygenEdmonds;
+pub use micali_vazirani::{MicaliVazirani, MicaliVaziraniError, Phase as MicaliVaziraniPhase};
 pub use mwpm::{FilteredEdge, WeightScaler, minimum_weight_perfect_matching};
 
-impl MatchingAlgorithm for EdmondsAlgorithm {
-    fn name(&self) -> &'static str {
-        "edmonds"
-    }
-
-    fn max_cardinality(&mut self, graph: &crate::graph::Graph) -> MatchingResult {
-        self.max_cardinality(graph)
-    }
-
-    fn min_weight_perfect(
-        &mut self,
-        graph: &crate::graph::Graph,
-    ) -> Result<MatchingResult, String> {
-        self.min_weight_perfect(graph)
-    }
-}
-
-impl MatchingAlgorithm for KorteVygenEdmonds<'_> {
-    fn name(&self) -> &'static str {
-        "korte_vygen"
-    }
-
-    fn max_cardinality(&mut self, graph: &crate::graph::Graph) -> MatchingResult {
-        assert_eq!(
-            graph.n,
-            self.graph().n,
-            "solver called with a different graph size"
-        );
-        assert_eq!(
-            graph.edges,
-            self.graph().edges,
-            "solver called with different edges"
-        );
-        self.max_cardinality()
-    }
-
-    fn min_weight_perfect(
-        &mut self,
-        graph: &crate::graph::Graph,
-    ) -> Result<MatchingResult, String> {
-        Self::min_weight_perfect_matching(graph)
-    }
-}
-
-impl MatchingAlgorithm for FastBlossomMatching {
-    fn name(&self) -> &'static str {
-        "fast_blossom"
-    }
-
-    fn max_cardinality(&mut self, graph: &crate::graph::Graph) -> MatchingResult {
-        Self::max_cardinality_matching(graph)
-    }
-
-    fn min_weight_perfect(
-        &mut self,
-        graph: &crate::graph::Graph,
-    ) -> Result<MatchingResult, String> {
-        Self::min_weight_perfect_matching(graph)
-    }
+/// Retained for study, but excluded from the primary API and benchmarks.
+pub mod reference {
+    pub use super::korte_vygen::KorteVygenEdmonds;
 }

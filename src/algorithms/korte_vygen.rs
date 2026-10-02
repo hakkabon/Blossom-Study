@@ -72,10 +72,6 @@ pub struct KorteVygenEdmonds<'a> {
 }
 
 impl<'a> KorteVygenEdmonds<'a> {
-    pub(crate) fn graph(&self) -> &Graph {
-        self.graph
-    }
-
     /// Creates a new solver initialized with `graph`
     pub fn new(graph: &'a Graph) -> Self {
         let n = graph.n;
@@ -492,10 +488,5 @@ impl<'a> KorteVygenEdmonds<'a> {
     pub fn max_cardinality_matching(graph: &'a Graph) -> MatchingResult {
         let mut algo = Self::new(graph);
         algo.max_cardinality()
-    }
-
-    /// Computes minimum weight perfect matching on `graph`
-    pub fn min_weight_perfect_matching(graph: &Graph) -> Result<MatchingResult, String> {
-        crate::algorithms::minimum_weight_perfect_matching(graph)
     }
 }

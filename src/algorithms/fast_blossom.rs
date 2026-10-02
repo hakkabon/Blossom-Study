@@ -289,9 +289,4 @@ impl FastBlossomMatching {
             },
         }
     }
-
-    /// Solves minimum weight perfect matching on `graph`
-    pub fn min_weight_perfect_matching(graph: &Graph) -> Result<MatchingResult, String> {
-        crate::algorithms::minimum_weight_perfect_matching(graph)
-    }
 }

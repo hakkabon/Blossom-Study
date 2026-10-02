@@ -8,7 +8,7 @@ pub mod benchmark;
 pub mod graph;
 
 pub use algorithms::{
-    EdmondsAlgorithm, FastBlossomMatching, KorteVygenEdmonds, MatchingAlgorithm, MatchingMetadata,
-    MatchingResult, minimum_weight_perfect_matching,
+    FastBlossomMatching, MatchingMetadata, MatchingResult, MicaliVazirani, MicaliVaziraniError,
+    MicaliVaziraniPhase, minimum_weight_perfect_matching,
 };
 pub use graph::{Edge, Graph};
