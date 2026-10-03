@@ -12,8 +12,8 @@ fn cardinality_benchmarks(c: &mut Criterion) {
     group.finish();
 }
 
-fn weighted_benchmarks(c: &mut Criterion) {
-    let mut group = c.benchmark_group("minimum-weight-perfect");
+fn weighted_benchmarks_dense(c: &mut Criterion) {
+    let mut group = c.benchmark_group("minimum-weight-perfect/dense-O(V3)");
     for n in [20, 50, 100, 200] {
         let graph = generator::complete_graph(n, (1.0, 100.0));
         group.bench_with_input(BenchmarkId::from_parameter(n), &graph, |b, graph| {
@@ -23,5 +23,21 @@ fn weighted_benchmarks(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, cardinality_benchmarks, weighted_benchmarks);
+fn weighted_benchmarks_sparse(c: &mut Criterion) {
+    let mut group = c.benchmark_group("minimum-weight-perfect/sparse-subcubic");
+    for n in [20, 50, 100, 200, 500] {
+        let graph = generator::complete_graph(n, (1.0, 100.0));
+        group.bench_with_input(BenchmarkId::from_parameter(n), &graph, |b, graph| {
+            b.iter(|| blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph));
+        });
+    }
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    cardinality_benchmarks,
+    weighted_benchmarks_dense,
+    weighted_benchmarks_sparse
+);
 criterion_main!(benches);

@@ -9,6 +9,6 @@ pub mod graph;
 
 pub use algorithms::{
     FastBlossomMatching, MatchingMetadata, MatchingResult, MicaliVazirani, MicaliVaziraniError,
-    MicaliVaziraniPhase, minimum_weight_perfect_matching,
+    MicaliVaziraniPhase, minimum_weight_perfect_matching, sparse_minimum_weight_perfect_matching,
 };
 pub use graph::{Edge, Graph};

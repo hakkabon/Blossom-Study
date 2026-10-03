@@ -64,11 +64,15 @@ pub mod fast_blossom;
 mod korte_vygen;
 pub mod micali_vazirani;
 pub mod mwpm;
+pub mod sparse_mwpm;
 mod union_find;
 
 pub use fast_blossom::FastBlossomMatching;
 pub use micali_vazirani::{MicaliVazirani, MicaliVaziraniError, Phase as MicaliVaziraniPhase};
 pub use mwpm::{FilteredEdge, WeightScaler, minimum_weight_perfect_matching};
+pub use sparse_mwpm::{
+    SparseBlossomSolver, SparseEdge, sparse_minimum_weight_perfect_matching,
+};
 
 /// Retained for study, but excluded from the primary API and benchmarks.
 pub mod reference {
