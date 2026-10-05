@@ -60,12 +60,14 @@ pub struct MatchingMetadata {
     pub runtime_ms: f64,
 }
 
+pub mod blossom_engine;
 pub mod fast_blossom;
 mod korte_vygen;
 pub mod micali_vazirani;
 pub mod mwpm;
 mod union_find;
 
+pub use blossom_engine::{BlossomEngine, blossom_engine_minimum_weight_perfect_matching};
 pub use fast_blossom::FastBlossomMatching;
 pub use micali_vazirani::{MicaliVazirani, MicaliVaziraniError, Phase as MicaliVaziraniPhase};
 pub use mwpm::{FilteredEdge, WeightScaler, minimum_weight_perfect_matching};

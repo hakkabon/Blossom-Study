@@ -42,5 +42,19 @@ fn documented_cli_workflow_succeeds() {
     );
     assert!(String::from_utf8_lossy(&weighted.stdout).contains("is_perfect=true"));
 
+    let blossom_engine = run(&[
+        "min-weight-perfect",
+        "--solver",
+        "blossom-engine",
+        "-i",
+        graph_path,
+    ]);
+    assert!(
+        blossom_engine.status.success(),
+        "{}",
+        String::from_utf8_lossy(&blossom_engine.stderr)
+    );
+    assert!(String::from_utf8_lossy(&blossom_engine.stdout).contains("is_perfect=true"));
+
     std::fs::remove_file(graph_path).expect("temporary graph should be removable");
 }

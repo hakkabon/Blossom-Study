@@ -13,6 +13,28 @@ pub enum Algorithm {
     MicaliVazirani,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum WeightedAlgorithm {
+    /// Existing dense-matrix primal-dual baseline
+    PrimalDual,
+    /// Independent Galil/Edmonds primal-dual implementation
+    BlossomEngine,
+}
+
+impl WeightedAlgorithm {
+    pub fn min_weight_perfect(
+        &self,
+        graph: &graph::Graph,
+    ) -> Result<algorithms::MatchingResult, String> {
+        match self {
+            Self::PrimalDual => algorithms::minimum_weight_perfect_matching(graph),
+            Self::BlossomEngine => {
+                algorithms::blossom_engine_minimum_weight_perfect_matching(graph)
+            }
+        }
+    }
+}
+
 impl Algorithm {
     pub fn max_cardinality(
         &self,
@@ -27,10 +49,6 @@ impl Algorithm {
                 .map_err(|error| error.to_string()),
         }
     }
-
-    pub fn min_weight_perfect(graph: &graph::Graph) -> Result<algorithms::MatchingResult, String> {
-        algorithms::minimum_weight_perfect_matching(graph)
-    }
 }
 
 #[derive(Parser)]
@@ -38,7 +56,7 @@ impl Algorithm {
 #[command(about = "Study and benchmark general-graph matching algorithms")]
 #[command(version)]
 struct Cli {
-    /// Cardinality solver (the weighted command always uses the primal-dual solver)
+    /// Cardinality solver (weighted commands select their solver separately)
     #[arg(short, long, value_enum, default_value = "fast-blossom")]
     algorithm: Algorithm,
 
@@ -65,6 +83,9 @@ enum Commands {
         /// Output results to file
         #[arg(short, long)]
         output: Option<String>,
+        /// Weighted solver implementation
+        #[arg(long, value_enum, default_value = "primal-dual")]
+        solver: WeightedAlgorithm,
     },
     /// Generate random test graphs
     Generate {
@@ -110,9 +131,15 @@ fn main() -> Result<()> {
                 .map_err(anyhow::Error::msg)?;
             print_matching_result(&result, output.as_deref(), false)?;
         }
-        Commands::MinWeightPerfect { input, output } => {
+        Commands::MinWeightPerfect {
+            input,
+            output,
+            solver,
+        } => {
             let graph = load_graph(&input)?;
-            let result = Algorithm::min_weight_perfect(&graph).map_err(anyhow::Error::msg)?;
+            let result = solver
+                .min_weight_perfect(&graph)
+                .map_err(anyhow::Error::msg)?;
             print_matching_result(&result, output.as_deref(), false)?;
         }
         Commands::Generate {
@@ -244,14 +271,24 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
             };
 
             for algo_name in &config.algorithms {
-                let algo = match algo_name.to_lowercase().as_str() {
-                    "fast_blossom" | "fast" => Algorithm::FastBlossom,
-                    "micali_vazirani" | "mv" => Algorithm::MicaliVazirani,
+                let result = match algo_name.to_lowercase().as_str() {
+                    "fast_blossom" | "fast" => Algorithm::FastBlossom.max_cardinality(&graph),
+                    "micali_vazirani" | "mv" => Algorithm::MicaliVazirani.max_cardinality(&graph),
+                    "primal_dual" | "primal-dual" | "mwpm" => {
+                        WeightedAlgorithm::PrimalDual.min_weight_perfect(&graph)
+                    }
+                    "blossom_engine" | "blossom-engine" => {
+                        WeightedAlgorithm::BlossomEngine.min_weight_perfect(&graph)
+                    }
                     _ => continue,
                 };
 
-                let Ok(res) = algo.max_cardinality(&graph) else {
-                    continue;
+                let res = match result {
+                    Ok(result) => result,
+                    Err(error) => {
+                        eprintln!("Skipping {algo_name} for n={n}, density={density}: {error}");
+                        continue;
+                    }
                 };
 
                 println!(
@@ -371,7 +408,27 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                     }
                     "min" => {
                         if let Some(ref g) = graph {
-                            match Algorithm::min_weight_perfect(g) {
+                            let solver = match parts.get(1).map(|name| name.to_lowercase()) {
+                                None => WeightedAlgorithm::PrimalDual,
+                                Some(name) if matches!(name.as_str(), "primal-dual" | "mwpm") => {
+                                    WeightedAlgorithm::PrimalDual
+                                }
+                                Some(name)
+                                    if matches!(
+                                        name.as_str(),
+                                        "blossom-engine" | "blossom_engine"
+                                    ) =>
+                                {
+                                    WeightedAlgorithm::BlossomEngine
+                                }
+                                Some(name) => {
+                                    println!(
+                                        "Unknown weighted solver: {name}. Use 'primal-dual' or 'blossom-engine'"
+                                    );
+                                    continue;
+                                }
+                            };
+                            match solver.min_weight_perfect(g) {
                                 Ok(result) => {
                                     print_matching_result(&result, None, true)?;
                                     last_result = Some(result);
@@ -451,7 +508,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                         println!("Commands:");
                         println!("  load <file>     - Load graph from JSON or DIMACS file");
                         println!("  max             - Run maximum cardinality matching");
-                        println!("  min             - Run minimum weight perfect matching");
+                        println!("  min [solver]    - Run MWPM (primal-dual or blossom-engine)");
                         println!("  graph           - Show loaded graph info");
                         println!("  edges           - List all edges");
                         println!("  result          - Show last matching result");

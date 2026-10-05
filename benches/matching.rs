@@ -16,8 +16,13 @@ fn weighted_benchmarks(c: &mut Criterion) {
     let mut group = c.benchmark_group("minimum-weight-perfect");
     for n in [20, 50, 100, 200] {
         let graph = generator::complete_graph(n, (1.0, 100.0));
-        group.bench_with_input(BenchmarkId::from_parameter(n), &graph, |b, graph| {
+        group.bench_with_input(BenchmarkId::new("primal-dual", n), &graph, |b, graph| {
             b.iter(|| blossom_study::algorithms::minimum_weight_perfect_matching(graph));
+        });
+        group.bench_with_input(BenchmarkId::new("blossom-engine", n), &graph, |b, graph| {
+            b.iter(|| {
+                blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(graph)
+            });
         });
     }
     group.finish();

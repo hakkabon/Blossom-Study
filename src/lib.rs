@@ -8,7 +8,8 @@ pub mod benchmark;
 pub mod graph;
 
 pub use algorithms::{
-    FastBlossomMatching, MatchingMetadata, MatchingResult, MicaliVazirani, MicaliVaziraniError,
-    MicaliVaziraniPhase, minimum_weight_perfect_matching,
+    BlossomEngine, FastBlossomMatching, MatchingMetadata, MatchingResult, MicaliVazirani,
+    MicaliVaziraniError, MicaliVaziraniPhase, blossom_engine_minimum_weight_perfect_matching,
+    minimum_weight_perfect_matching,
 };
 pub use graph::{Edge, Graph};
