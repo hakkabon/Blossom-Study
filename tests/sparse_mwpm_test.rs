@@ -4,7 +4,10 @@ use blossom_study::{minimum_weight_perfect_matching, sparse_minimum_weight_perfe
 fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
     Graph::from_edges(
         n,
-        edges.iter().map(|&(u, v, w)| Edge::new(u, v, Some(w))).collect(),
+        edges
+            .iter()
+            .map(|&(u, v, w)| Edge::new(u, v, Some(w)))
+            .collect(),
     )
 }
 
@@ -43,14 +46,18 @@ fn test_sparse_mwpm_matches_brute_force_oracle() {
     for trial in 0..40 {
         let mut costs = vec![vec![0.0; n]; n];
         let mut edges = Vec::new();
-        for u in 0..n {
-            for v in (u + 1)..n {
+        let mut u = 0;
+        while u < n {
+            let mut v = u + 1;
+            while v < n {
                 state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
                 let weight = ((state >> 32) % 401) as f64 / 10.0 - 20.0;
                 edges.push((u, v, weight));
                 costs[u][v] = weight;
                 costs[v][u] = weight;
+                v += 1;
             }
+            u += 1;
         }
         let g = graph(n, &edges);
         let sparse_result = sparse_minimum_weight_perfect_matching(&g).unwrap();

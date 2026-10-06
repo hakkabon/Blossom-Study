@@ -19,6 +19,12 @@ pub enum WeightedAlgorithm {
     PrimalDual,
     /// Independent Galil/Edmonds primal-dual implementation
     BlossomEngine,
+    /// Sparse event-driven primal-dual implementation
+    SparseBlossom,
+    /// MIT-attributed flat-containment Blossom-Tree implementation
+    BlossomTree,
+    /// Incomplete complete-graph Cherry-Tree prototype
+    CherryTreeExperimental,
 }
 
 impl WeightedAlgorithm {
@@ -31,6 +37,9 @@ impl WeightedAlgorithm {
             Self::BlossomEngine => {
                 algorithms::blossom_engine_minimum_weight_perfect_matching(graph)
             }
+            Self::SparseBlossom => algorithms::sparse_minimum_weight_perfect_matching(graph),
+            Self::BlossomTree => algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
+            Self::CherryTreeExperimental => algorithms::cherry_tree_prototype_matching(graph),
         }
     }
 }
@@ -280,6 +289,15 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
                     "blossom_engine" | "blossom-engine" => {
                         WeightedAlgorithm::BlossomEngine.min_weight_perfect(&graph)
                     }
+                    "sparse_blossom" | "sparse-blossom" | "sparse" => {
+                        WeightedAlgorithm::SparseBlossom.min_weight_perfect(&graph)
+                    }
+                    "blossom_tree" | "blossom-tree" => {
+                        WeightedAlgorithm::BlossomTree.min_weight_perfect(&graph)
+                    }
+                    "cherry_tree" | "cherry-tree" | "cherry-tree-experimental" => {
+                        WeightedAlgorithm::CherryTreeExperimental.min_weight_perfect(&graph)
+                    }
                     _ => continue,
                 };
 
@@ -421,9 +439,30 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                                 {
                                     WeightedAlgorithm::BlossomEngine
                                 }
+                                Some(name)
+                                    if matches!(
+                                        name.as_str(),
+                                        "sparse" | "sparse-blossom" | "sparse_blossom"
+                                    ) =>
+                                {
+                                    WeightedAlgorithm::SparseBlossom
+                                }
+                                Some(name)
+                                    if matches!(name.as_str(), "blossom-tree" | "blossom_tree") =>
+                                {
+                                    WeightedAlgorithm::BlossomTree
+                                }
+                                Some(name)
+                                    if matches!(
+                                        name.as_str(),
+                                        "cherry-tree" | "cherry_tree" | "cherry-tree-experimental"
+                                    ) =>
+                                {
+                                    WeightedAlgorithm::CherryTreeExperimental
+                                }
                                 Some(name) => {
                                     println!(
-                                        "Unknown weighted solver: {name}. Use 'primal-dual' or 'blossom-engine'"
+                                        "Unknown weighted solver: {name}. Use 'primal-dual', 'blossom-engine', 'sparse-blossom', 'blossom-tree', or 'cherry-tree-experimental'"
                                     );
                                     continue;
                                 }
@@ -508,7 +547,9 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                         println!("Commands:");
                         println!("  load <file>     - Load graph from JSON or DIMACS file");
                         println!("  max             - Run maximum cardinality matching");
-                        println!("  min [solver]    - Run MWPM (primal-dual or blossom-engine)");
+                        println!(
+                            "  min [solver]    - Run a weighted solver (see README for names and status)"
+                        );
                         println!("  graph           - Show loaded graph info");
                         println!("  edges           - List all edges");
                         println!("  result          - Show last matching result");

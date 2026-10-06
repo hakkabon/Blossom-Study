@@ -61,6 +61,10 @@ pub struct MatchingMetadata {
 }
 
 pub mod blossom_engine;
+pub mod blossom_tree;
+mod blossom_tree_flat;
+pub mod cherry_tree;
+pub mod cherry_tree_prototype;
 pub mod fast_blossom;
 mod korte_vygen;
 pub mod micali_vazirani;
@@ -69,12 +73,12 @@ pub mod sparse_mwpm;
 mod union_find;
 
 pub use blossom_engine::{BlossomEngine, blossom_engine_minimum_weight_perfect_matching};
+pub use blossom_tree::{BlossomTreeSolver, blossom_tree_minimum_weight_perfect_matching};
+pub use cherry_tree::{CherryTreePrototype, cherry_tree_prototype_matching};
 pub use fast_blossom::FastBlossomMatching;
 pub use micali_vazirani::{MicaliVazirani, MicaliVaziraniError, Phase as MicaliVaziraniPhase};
 pub use mwpm::{FilteredEdge, WeightScaler, minimum_weight_perfect_matching};
-pub use sparse_mwpm::{
-    SparseBlossomSolver, SparseEdge, sparse_minimum_weight_perfect_matching,
-};
+pub use sparse_mwpm::{SparseBlossomSolver, SparseEdge, sparse_minimum_weight_perfect_matching};
 
 /// Retained for study, but excluded from the primary API and benchmarks.
 pub mod reference {

@@ -1,15 +1,16 @@
-//! Sub-cubic Sparse Event-Driven Minimum-Weight Perfect Matching (MWPM)
+//! Experimental sparse event-driven Minimum-Weight Perfect Matching (MWPM)
 //!
 //! This module provides an alternative, sub-cubic implementation of the
 //! Primal-Dual Blossom Algorithm for Minimum-Weight Perfect Matching on general graphs.
 //!
-//! # Algorithmic Complexity
-//! - **Time Complexity**: $O(V \cdot E)$ (or $O(V^2)$ on sparse graphs with $E = O(V)$),
-//!   compared to $O(V^3)$ in the dense matrix solver.
-//! - **Space Complexity**: Strictly $O(V + E)$ memory using sparse adjacency lists
-//!   and component-level incident edge maps, avoiding any $O(V^2)$ dense matrix allocations.
+//! The implementation is designed to avoid dense matrices by using adjacency
+//! lists and component-level incident-edge maps.  Its intended event-driven
+//! work bound is `O(VE)`, but this educational version has not yet been given a
+//! formal amortized-complexity proof.  In particular, contraction rebuilds maps
+//! and should be benchmarked before describing the implementation as strictly
+//! sub-cubic or strictly `O(V + E)` in all intermediate states.
 
-use crate::algorithms::mwpm::{filter_edges, WeightScaler};
+use crate::algorithms::mwpm::{WeightScaler, filter_edges};
 use crate::algorithms::{MatchingMetadata, MatchingResult};
 use crate::graph::Graph;
 use std::collections::{HashMap, VecDeque};
@@ -139,10 +140,10 @@ impl SparseBlossomSolver {
             } else {
                 None
             };
-            if let Some(edge) = tree_endpoint {
-                if edge.weight > 0 {
-                    self.update_slack(edge, x);
-                }
+            if let Some(edge) = tree_endpoint
+                && edge.weight > 0
+            {
+                self.update_slack(edge, x);
             }
         }
     }
@@ -417,14 +418,14 @@ impl SparseBlossomSolver {
                 }
             }
             for x in 1..=self.n_x {
-                if self.st[x] == x {
-                    if let Some(edge) = self.slack_edge[x] {
-                        let delta = self.e_delta(edge);
-                        if self.s[x] == -1 {
-                            d = d.min(delta);
-                        } else if self.s[x] == 0 {
-                            d = d.min(delta / 2);
-                        }
+                if self.st[x] == x
+                    && let Some(edge) = self.slack_edge[x]
+                {
+                    let delta = self.e_delta(edge);
+                    if self.s[x] == -1 {
+                        d = d.min(delta);
+                    } else if self.s[x] == 0 {
+                        d = d.min(delta / 2);
                     }
                 }
             }
@@ -460,10 +461,11 @@ impl SparseBlossomSolver {
             for x in 1..=self.n_x {
                 if self.st[x] == x && self.slack_edge[x].is_some() {
                     let edge = self.slack_edge[x].unwrap();
-                    if self.st[edge.u as usize] != x && self.e_delta(edge) == 0 {
-                        if self.on_found_edge(edge) {
-                            return true;
-                        }
+                    if self.st[edge.u as usize] != x
+                        && self.e_delta(edge) == 0
+                        && self.on_found_edge(edge)
+                    {
+                        return true;
                     }
                 }
             }
@@ -577,8 +579,8 @@ pub fn sparse_minimum_weight_perfect_matching(graph: &Graph) -> Result<MatchingR
         |(min_cost, max_cost), &(_, _, _, cost)| (min_cost.min(cost), max_cost.max(cost)),
     );
 
-    let k = i128::try_from(graph.n / 2)
-        .map_err(|_| "vertex count exceeds i128 limit".to_string())?;
+    let k =
+        i128::try_from(graph.n / 2).map_err(|_| "vertex count exceeds i128 limit".to_string())?;
 
     let cardinality_bonus = max_cost
         .checked_sub(min_cost)
@@ -590,7 +592,9 @@ pub fn sparse_minimum_weight_perfect_matching(graph: &Graph) -> Result<MatchingR
     // The maximum lab value is w_max ≈ cardinality_bonus; dual deltas are at most w_max,
     // and blossom labs are doubled, so we conservatively require 4 * cardinality_bonus < i128::MAX.
     if cardinality_bonus > i128::MAX / 4 {
-        return Err("edge-weight range is too large for the sparse solver's i128 arithmetic".to_string());
+        return Err(
+            "edge-weight range is too large for the sparse solver's i128 arithmetic".to_string(),
+        );
     }
 
     // 3. Build sparse adjacency list (1-indexed for solver)

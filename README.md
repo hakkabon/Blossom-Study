@@ -14,9 +14,14 @@ blossom-study/
 │   └── algorithms/
 │       ├── mod.rs          # Common types and traits
 │       ├── blossom_engine.rs # Independent weighted blossom solver
+│       ├── blossom_tree.rs # Flat-containment adapter
+│       ├── blossom_tree_flat.rs # MIT-attributed Blossom-Tree engine
+│       ├── cherry_tree.rs # Guarded experimental adapter
+│       ├── cherry_tree_prototype.rs # Incomplete educational prototype
 │       ├── fast_blossom.rs # Active conventional cardinality baseline
 │       ├── micali_vazirani.rs # Experimental phase-based scaffold
 │       ├── mwpm.rs         # Active weighted primal-dual solver adapter
+│       ├── sparse_mwpm.rs  # Sparse event-driven experiment
 │       └── korte_vygen.rs  # Reference-only implementation
 ├── tests/
 │   ├── matching.rs         # Integration and cross-implementation tests
@@ -34,6 +39,9 @@ blossom-study/
 - 🚧 Micali–Vazirani state and phase scaffold
 - ✅ O(V³) minimum-weight perfect matching
 - ✅ Independent Galil/Edmonds primal-dual MWPM solver (`blossom-engine`)
+- ✅ Flat-containment Blossom-Tree solver (`blossom-tree`)
+- 🧪 Sparse event-driven solver (`sparse-blossom`)
+- 🚧 Guarded but incomplete Cherry-Tree prototype (`cherry-tree-experimental`)
 - ✅ Graph generation (complete, sparse, grid)
 - ✅ JSON serialization for graphs
 - ✅ Benchmark framework
@@ -42,6 +50,8 @@ blossom-study/
 ### Known Limitations
 - ⚠️ Micali–Vazirani level search, bridge processing, petals, and augmentation are not implemented yet
 - ⚠️ Weighted solver metadata currently reports runtime but not its internal contractions or dual updates
+- ⚠️ Cherry-Tree does not yet provide an optimality guarantee; successful output is validated only as a perfect matching
+- ⚠️ SparseBlossomSolver targets `O(VE)` behavior, but its contraction-map rebuilding has not received a formal amortized analysis
 
 ### Performance (Debug Build)
 | Graph | Vertices | Edges | Match Size | Time (ms) | Blossoms |
@@ -66,6 +76,15 @@ cargo run -- min-weight-perfect -i graph.json
 
 # Independent in-repository Galil/Edmonds implementation
 cargo run -- min-weight-perfect --solver blossom-engine -i graph.json
+
+# Sparse event-driven experiment
+cargo run -- min-weight-perfect --solver sparse-blossom -i graph.json
+
+# Flat-containment Blossom-Tree variant
+cargo run -- min-weight-perfect --solver blossom-tree -i graph.json
+
+# Incomplete complete-graph prototype; may return a validated error
+cargo run -- min-weight-perfect --solver cherry-tree-experimental -i graph.json
 ```
 
 ### Benchmark
@@ -80,13 +99,30 @@ cargo bench --bench matching
 
 Fast Blossom is the active conventional unweighted baseline. Korte–Vygen is retained under `algorithms::reference` for study but is excluded from normal benchmarks. The former explicit-blossom implementation is retired from the public API.
 
-Two O(V³) weighted implementations are available. `primal-dual` is the established `integer-blossom` baseline. `blossom-engine` is an independent in-repository implementation of the Galil/Edmonds primal-dual method with explicit alternating forests, nested blossoms, vertex and blossom dual variables, contraction, expansion, and augmentation. Both convert finite `f64` costs exactly to a common `i128` representation and reject inputs that exceed the available arithmetic headroom.
+Five weighted implementations are collected:
+
+| CLI solver | Representation | Status |
+| --- | --- | --- |
+| `primal-dual` | edge-list Galil/Edmonds, exact `i128` duals | established baseline |
+| `blossom-engine` | explicit alternating forest and nested blossoms, exact `i128` duals | independent verified implementation |
+| `blossom-tree` | flat contraction history and hash-based containment, exact `i128` duals | verified MIT-attributed adaptation |
+| `sparse-blossom` | adjacency lists and incident-edge maps, exact `i128` duals | experimental; intended sparse-graph solver |
+| `cherry-tree-experimental` | distance matrix and disjoint-set contractions, floating-point duals | incomplete educational prototype |
+
+The first four solvers are cross-checked against brute-force or established solver oracles. Cherry-Tree has known gaps in nested-blossom path routing and label restoration, so its adapter only accepts complete graphs, bounds the search, catches ordinary panics, and validates feasibility before returning a result. These safeguards do **not** establish optimality; the prototype is deliberately excluded from the default Criterion suite.
 
 Key components:
 - **Fast Blossom** - DSU contraction with timestamp-based LCA
 - **Micali–Vazirani scaffold** - explicit phases, MIN/MAX levels, predecessors, bridges, and petal bases
 - **Primal-dual weighted matching** - O(V³), with exact dual arithmetic and sparse-graph support
 - **Blossom Engine** - independent, extensively commented Galil/Edmonds primal-dual implementation
+- **Blossom Tree** - MIT-attributed flat-containment adaptation with immutable contraction history
+- **Sparse Blossom** - experimental event-driven adjacency/map representation
+- **Cherry Tree** - guarded educational prototype with documented missing nested-blossom operations
+
+## Provenance and licensing
+
+`Blossom-Tree` is adapted from `mwmatching` 0.1.1 and remains under its MIT license. The required notice is retained in [`LICENSE-MWMATCHING`](LICENSE-MWMATCHING). No `mwmatching` crate dependency is used. Cherry-Tree is included as project source and is clearly separated from the verified solver paths.
 
 ## Future Work
 
