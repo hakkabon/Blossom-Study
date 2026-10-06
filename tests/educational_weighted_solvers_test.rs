@@ -1,8 +1,8 @@
 //! Cross-checks for the newly collected educational weighted solvers.
 //!
-//! Blossom-Tree is expected to agree with the established exact solver.
-//! Cherry-Tree is deliberately tested only for safe execution and matching
-//! feasibility because its nested-blossom optimality logic is unfinished.
+//! Blossom-Tree and the repaired Cherry-Tree matrix front end are expected to
+//! agree with the established exact solver.  The cases below include the tiny
+//! same-tree collision that corrupted the former Cherry implementation.
 
 use blossom_study::graph::{Edge, Graph};
 use blossom_study::{
@@ -98,6 +98,69 @@ fn cherry_tree_can_return_a_valid_result_on_a_simple_complete_graph() {
     );
     let result = CherryTreePrototype::new().solve(&graph).unwrap();
     assert_perfect(&graph, &result);
-    // This assertion documents this easy case, not a general optimality claim.
     assert_eq!(result.total_weight, 2.0);
+}
+
+#[test]
+fn cherry_tree_handles_the_equal_weight_k4_regression() {
+    let graph = graph(
+        4,
+        &[
+            (0, 1, 1.0),
+            (0, 2, 1.0),
+            (0, 3, 1.0),
+            (1, 2, 1.0),
+            (1, 3, 1.0),
+            (2, 3, 1.0),
+        ],
+    );
+    let result = CherryTreePrototype::new().solve(&graph).unwrap();
+    assert_perfect(&graph, &result);
+    assert_eq!(result.total_weight, 2.0);
+}
+
+#[test]
+fn cherry_tree_handles_the_unique_k4_regression() {
+    // Lexicographic edge weights [01, 02, 03, 12, 13, 23].  The former
+    // implementation misclassified a same-tree even/even collision here and
+    // produced a non-reciprocal mate table.
+    let graph = graph(
+        4,
+        &[
+            (0, 1, 1.0),
+            (0, 2, 2.0),
+            (0, 3, 4.0),
+            (1, 2, 3.0),
+            (1, 3, 6.0),
+            (2, 3, 5.0),
+        ],
+    );
+    let result = CherryTreePrototype::new().solve(&graph).unwrap();
+    assert_perfect(&graph, &result);
+    assert_eq!(result.total_weight, 6.0);
+}
+
+#[test]
+fn cherry_tree_matches_exact_baseline_on_complete_graphs() {
+    let mut state = 0xc4e2_7719_5eed_u64;
+    for n in [4, 6, 8] {
+        for case in 0..100 {
+            let mut edges = Vec::new();
+            for u in 0..n {
+                for v in (u + 1)..n {
+                    state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    let weight = ((state >> 32) % 401) as f64 / 4.0 - 50.0;
+                    edges.push((u, v, weight));
+                }
+            }
+            let graph = graph(n, &edges);
+            let expected = minimum_weight_perfect_matching(&graph).unwrap();
+            let actual = CherryTreePrototype::new().solve(&graph).unwrap();
+            assert_perfect(&graph, &actual);
+            assert_eq!(
+                actual.total_weight, expected.total_weight,
+                "n={n}, case={case}"
+            );
+        }
+    }
 }

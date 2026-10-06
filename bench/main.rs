@@ -48,10 +48,33 @@ fn main() {
         );
 
         if graph.n % 2 == 0 {
-            for (algorithm, result) in [(
-                "rust-mwpm",
-                blossom_study::minimum_weight_perfect_matching(&graph),
-            )] {
+            let mut weighted_results = vec![
+                (
+                    "rust-mwpm",
+                    blossom_study::minimum_weight_perfect_matching(&graph),
+                ),
+                (
+                    "engine",
+                    blossom_study::blossom_engine_minimum_weight_perfect_matching(&graph),
+                ),
+                (
+                    "tree",
+                    blossom_study::blossom_tree_minimum_weight_perfect_matching(&graph),
+                ),
+            ];
+
+            // Cherry-Tree deliberately preserves its complete distance-matrix
+            // interface, so benchmarking it on a sparse or grid graph would
+            // measure input rejection rather than matching performance.
+            let complete_edge_count = graph.n.saturating_mul(graph.n.saturating_sub(1)) / 2;
+            if graph.edges.len() == complete_edge_count {
+                weighted_results.push((
+                    "cherry",
+                    blossom_study::cherry_tree_minimum_weight_perfect_matching(&graph),
+                ));
+            }
+
+            for (algorithm, result) in weighted_results {
                 match result {
                     Ok(result) => println!(
                         "{:<20} | {:>10} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>10}",
@@ -70,5 +93,6 @@ fn main() {
     }
 
     println!("\nFast Blossom is the active maximum-cardinality baseline.");
-    println!("Weighted rows use the shared O(V³) primal-dual blossom solver.");
+    println!("Weighted rows compare the available O(V³) primal-dual representations.");
+    println!("Cherry includes dense-matrix conversion and shares the engine search kernel.");
 }

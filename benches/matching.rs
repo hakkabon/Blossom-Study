@@ -32,6 +32,15 @@ fn weighted_benchmarks_dense(c: &mut Criterion) {
                 blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph)
             });
         });
+        group.bench_with_input(
+            BenchmarkId::new("cherry-tree-dense", n),
+            &graph,
+            |b, graph| {
+                b.iter(|| {
+                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph)
+                });
+            },
+        );
     }
     group.finish();
 }

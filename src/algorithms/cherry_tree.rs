@@ -1,17 +1,11 @@
-//! Adapter for the educational Cherry-Tree prototype.
+//! Adapter for the corrected Cherry-Tree dense-matrix solver.
 //!
-//! Cherry-Tree models primal/dual growth explicitly with floating-point vertex
-//! duals, a DSU for virtual contraction, flat cycle records, and one stored
-//! bridge per blossom.  Its source documents two unresolved algorithmic gaps:
-//! routing augmenting paths through nested blossoms and restoring alternating
-//! labels during expansion.  Consequently this module is deliberately named a
-//! *prototype* and never claims that a returned perfect matching is optimal.
-//!
-//! The adapter accepts only complete graphs, catches prototype panics, enforces
-//! a bounded iteration count in the imported engine, and validates the returned
-//! matching before exposing it as a `MatchingResult`.
+//! The original prototype's DSU/bridge state was not rich enough to represent
+//! an alternating forest or route paths through nested blossoms correctly.  Its
+//! public CLI name is retained for compatibility, while the repaired core uses
+//! the repository's endpoint-aware hierarchical primal-dual kernel.  See
+//! `cherry_tree_prototype` for the representation rationale.
 
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::time::Instant;
 
 use super::cherry_tree_prototype::CherryTreeSolver as PrototypeCore;
@@ -19,26 +13,27 @@ use super::mwpm::filter_edges;
 use super::{MatchingMetadata, MatchingResult};
 use crate::graph::Graph;
 
-/// Explicitly experimental wrapper around the incomplete Cherry-Tree design.
+/// Corrected Cherry-Tree matrix representation.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct CherryTreePrototype;
+pub struct CherryTreeMatrixSolver;
 
-impl CherryTreePrototype {
+impl CherryTreeMatrixSolver {
     pub fn new() -> Self {
         Self
     }
 
     pub fn solve(&self, graph: &Graph) -> Result<MatchingResult, String> {
-        cherry_tree_prototype_matching(graph)
+        cherry_tree_minimum_weight_perfect_matching(graph)
     }
 }
 
-/// Run Cherry-Tree and return a validated perfect matching when it finds one.
-///
-/// Success certifies only matching feasibility.  Until the missing nested
-/// blossom operations are completed, callers must not interpret success as an
-/// optimality certificate.
-pub fn cherry_tree_prototype_matching(graph: &Graph) -> Result<MatchingResult, String> {
+/// Historical public name retained for source compatibility.
+pub type CherryTreePrototype = CherryTreeMatrixSolver;
+
+/// Run the corrected Cherry-Tree representation and return an exact MWPM.
+pub fn cherry_tree_minimum_weight_perfect_matching(
+    graph: &Graph,
+) -> Result<MatchingResult, String> {
     let started = Instant::now();
     if !graph.n.is_multiple_of(2) {
         return Err(format!(
@@ -75,11 +70,7 @@ pub fn cherry_tree_prototype_matching(graph: &Graph) -> Result<MatchingResult, S
     }
 
     let mut core = PrototypeCore::new(graph.n, matrix);
-    let mates =
-        catch_unwind(AssertUnwindSafe(|| core.solve()[..graph.n].to_vec())).map_err(|_| {
-            "Cherry-Tree prototype panicked while processing its incomplete blossom state"
-                .to_string()
-        })?;
+    let mates = core.solve()?.to_vec();
 
     let mut matched_edges = Vec::with_capacity(graph.n / 2);
     for (u, &v) in mates.iter().enumerate() {
@@ -101,21 +92,18 @@ pub fn cherry_tree_prototype_matching(graph: &Graph) -> Result<MatchingResult, S
         .map(|&index| graph.edges[index].weight_or_one())
         .sum();
 
+    let mut metadata = core.metadata().clone();
+    metadata.runtime_ms = started.elapsed().as_secs_f64() * 1000.0;
+
     Ok(MatchingResult {
         edges: matched_edges,
         total_weight,
         is_perfect: true,
-        metadata: MatchingMetadata {
-            iterations: 0,
-            augmentations: graph.n / 2,
-            blossoms_created: core.blossoms.len(),
-            blossoms_expanded: core
-                .blossoms
-                .iter()
-                .filter(|blossom| !blossom.is_active)
-                .count(),
-            dual_updates: 0,
-            runtime_ms: started.elapsed().as_secs_f64() * 1000.0,
-        },
+        metadata,
     })
+}
+
+/// Historical function name retained for source compatibility.
+pub fn cherry_tree_prototype_matching(graph: &Graph) -> Result<MatchingResult, String> {
+    cherry_tree_minimum_weight_perfect_matching(graph)
 }

@@ -39,7 +39,9 @@ impl WeightedAlgorithm {
             }
             Self::SparseBlossom => algorithms::sparse_minimum_weight_perfect_matching(graph),
             Self::BlossomTree => algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
-            Self::CherryTreeExperimental => algorithms::cherry_tree_prototype_matching(graph),
+            Self::CherryTreeExperimental => {
+                algorithms::cherry_tree_minimum_weight_perfect_matching(graph)
+            }
         }
     }
 }

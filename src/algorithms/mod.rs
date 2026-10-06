@@ -74,7 +74,10 @@ mod union_find;
 
 pub use blossom_engine::{BlossomEngine, blossom_engine_minimum_weight_perfect_matching};
 pub use blossom_tree::{BlossomTreeSolver, blossom_tree_minimum_weight_perfect_matching};
-pub use cherry_tree::{CherryTreePrototype, cherry_tree_prototype_matching};
+pub use cherry_tree::{
+    CherryTreeMatrixSolver, CherryTreePrototype, cherry_tree_minimum_weight_perfect_matching,
+    cherry_tree_prototype_matching,
+};
 pub use fast_blossom::FastBlossomMatching;
 pub use micali_vazirani::{MicaliVazirani, MicaliVaziraniError, Phase as MicaliVaziraniPhase};
 pub use mwpm::{FilteredEdge, WeightScaler, minimum_weight_perfect_matching};
