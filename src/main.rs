@@ -9,7 +9,7 @@ use rustyline::DefaultEditor;
 pub enum Algorithm {
     /// Fast Blossom (DSU with timestamp LCA)
     FastBlossom,
-    /// Experimental Micali–Vazirani scaffold
+    /// Phased Micali–Vazirani implementation (level search milestone)
     MicaliVazirani,
 }
 
@@ -23,8 +23,8 @@ pub enum WeightedAlgorithm {
     SparseBlossom,
     /// MIT-attributed flat-containment Blossom-Tree implementation
     BlossomTree,
-    /// Incomplete complete-graph Cherry-Tree prototype
-    CherryTreeExperimental,
+    /// Self-contained repaired Cherry-Tree primal-dual implementation
+    CherryTree,
 }
 
 impl WeightedAlgorithm {
@@ -39,9 +39,7 @@ impl WeightedAlgorithm {
             }
             Self::SparseBlossom => algorithms::sparse_minimum_weight_perfect_matching(graph),
             Self::BlossomTree => algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
-            Self::CherryTreeExperimental => {
-                algorithms::cherry_tree_minimum_weight_perfect_matching(graph)
-            }
+            Self::CherryTree => algorithms::cherry_tree_minimum_weight_perfect_matching(graph),
         }
     }
 }
@@ -297,8 +295,8 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
                     "blossom_tree" | "blossom-tree" => {
                         WeightedAlgorithm::BlossomTree.min_weight_perfect(&graph)
                     }
-                    "cherry_tree" | "cherry-tree" | "cherry-tree-experimental" => {
-                        WeightedAlgorithm::CherryTreeExperimental.min_weight_perfect(&graph)
+                    "cherry_tree" | "cherry-tree" => {
+                        WeightedAlgorithm::CherryTree.min_weight_perfect(&graph)
                     }
                     _ => continue,
                 };
@@ -359,7 +357,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
     println!(
         "Commands: load <file>, max, min, graph, edges, result, save <file>, algo <name>, quit"
     );
-    println!("Algorithms: fast_blossom, micali_vazirani (scaffold)");
+    println!("Algorithms: fast_blossom, micali_vazirani (level-search milestone)");
     println!("File formats: JSON (.json), DIMACS (.dimacs, .dat, .txt)");
     println!();
 
@@ -455,16 +453,13 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                                     WeightedAlgorithm::BlossomTree
                                 }
                                 Some(name)
-                                    if matches!(
-                                        name.as_str(),
-                                        "cherry-tree" | "cherry_tree" | "cherry-tree-experimental"
-                                    ) =>
+                                    if matches!(name.as_str(), "cherry-tree" | "cherry_tree") =>
                                 {
-                                    WeightedAlgorithm::CherryTreeExperimental
+                                    WeightedAlgorithm::CherryTree
                                 }
                                 Some(name) => {
                                     println!(
-                                        "Unknown weighted solver: {name}. Use 'primal-dual', 'blossom-engine', 'sparse-blossom', 'blossom-tree', or 'cherry-tree-experimental'"
+                                        "Unknown weighted solver: {name}. Use 'primal-dual', 'blossom-engine', 'sparse-blossom', 'blossom-tree', or 'cherry-tree'"
                                     );
                                     continue;
                                 }
