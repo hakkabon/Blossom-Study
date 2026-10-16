@@ -107,6 +107,7 @@ fn main() {
 
     println!("\nMICALI-VAZIRANI DEVELOPMENT PHASE");
     println!("Only alternating level search is timed; this is not an end-to-end matcher.");
+    println!("-- Complete graphs (dense, O(n^2) edges) --");
     for n in [20, 50, 100] {
         let graph = generator::complete_graph(n, (1.0, 100.0));
         let started = std::time::Instant::now();
@@ -115,8 +116,59 @@ fn main() {
             .run_level_search_phase(&graph)
             .expect("level search should accept its construction graph");
         println!(
-            "  n={n:>4}, scans={:>8}, time={:>8.3} ms",
+            "  dense  n={n:>4}, edges={:>6}, scans={:>8}, time={:>8.3} ms",
+            graph.edges.len(),
             solver.level_search_scans(),
+            started.elapsed().as_secs_f64() * 1000.0
+        );
+    }
+
+    println!("-- Grid graphs (sparse planar, O(n) edges) --");
+    for side in [10, 20, 30] {
+        let n = side * side;
+        let graph = generator::grid_graph(side, side, (1.0, 100.0));
+        let started = std::time::Instant::now();
+        let mut solver = MicaliVazirani::new(&graph);
+        solver
+            .run_level_search_phase(&graph)
+            .expect("level search should accept its construction graph");
+        println!(
+            "  grid   n={n:>4}, edges={:>6}, scans={:>8}, time={:>8.3} ms",
+            graph.edges.len(),
+            solver.level_search_scans(),
+            started.elapsed().as_secs_f64() * 1000.0
+        );
+    }
+
+    println!("-- Planted 50% matching (multi-hop alternating exploration) --");
+    for n in [20, 50, 100] {
+        let mut edges = Vec::new();
+        let matched_pairs = (n / 4) * 2;
+        let mut mate = vec![None; n];
+        for u in (0..matched_pairs).step_by(2) {
+            edges.push(Edge::new(u, u + 1, Some(1.0)));
+            mate[u] = Some(u + 1);
+            mate[u + 1] = Some(u);
+        }
+        for u in 0..n {
+            for offset in [2, 3, 5] {
+                let v = (u + offset) % n;
+                if u < v {
+                    edges.push(Edge::new(u, v, Some(1.0)));
+                }
+            }
+        }
+        let graph = Graph::from_edges(n, edges);
+        let started = std::time::Instant::now();
+        let mut solver = MicaliVazirani::with_matching(&graph, mate).unwrap();
+        solver
+            .run_level_search_phase(&graph)
+            .expect("level search should accept its construction graph");
+        println!(
+            "  planted n={n:>3}, edges={:>6}, scans={:>8}, bridges={:>3}, time={:>8.3} ms",
+            graph.edges.len(),
+            solver.level_search_scans(),
+            solver.bridge_candidates().len(),
             started.elapsed().as_secs_f64() * 1000.0
         );
     }

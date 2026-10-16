@@ -21,11 +21,58 @@ fn cardinality_benchmarks(c: &mut Criterion) {
     for n in [20, 50, 100, 200] {
         let graph = generator::complete_graph(n, (1.0, 100.0));
         development.bench_with_input(
-            BenchmarkId::new("micali-vazirani-level-search", n),
+            BenchmarkId::new("mv-level-search/complete-dense", n),
             &graph,
             |b, graph| {
                 b.iter(|| {
                     let mut solver = MicaliVazirani::new(graph);
+                    solver.run_level_search_phase(graph)
+                });
+            },
+        );
+    }
+
+    for side in [5, 10, 15, 20] {
+        let n = side * side;
+        let graph = generator::grid_graph(side, side, (1.0, 100.0));
+        development.bench_with_input(
+            BenchmarkId::new("mv-level-search/sparse-grid", n),
+            &graph,
+            |b, graph| {
+                b.iter(|| {
+                    let mut solver = MicaliVazirani::new(graph);
+                    solver.run_level_search_phase(graph)
+                });
+            },
+        );
+    }
+
+    for n in [20, 50, 100, 200] {
+        let mut edges = Vec::new();
+        let matched_pairs = (n / 4) * 2;
+        let mut mate = vec![None; n];
+        for u in (0..matched_pairs).step_by(2) {
+            edges.push(Edge::new(u, u + 1, Some(1.0)));
+            mate[u] = Some(u + 1);
+            mate[u + 1] = Some(u);
+        }
+        for u in 0..n {
+            for offset in [2, 3, 5] {
+                let v = (u + offset) % n;
+                if u < v {
+                    edges.push(Edge::new(u, v, Some(1.0)));
+                }
+            }
+        }
+        let graph = Graph::from_edges(n, edges);
+        development.bench_with_input(
+            BenchmarkId::new("mv-level-search/planted-50pct-matched", n),
+            &graph,
+            |b, graph| {
+                let initial_mate = mate.clone();
+                b.iter(|| {
+                    let mut solver =
+                        MicaliVazirani::with_matching(graph, initial_mate.clone()).unwrap();
                     solver.run_level_search_phase(graph)
                 });
             },

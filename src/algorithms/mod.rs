@@ -77,7 +77,10 @@ pub use blossom_tree::{BlossomTreeSolver, blossom_tree_minimum_weight_perfect_ma
 pub use cherry_tree_solver::{CherryTreeSolver, cherry_tree_minimum_weight_perfect_matching};
 pub use fast_blossom::FastBlossomMatching;
 pub use hungarian::{HungarianSolver, hungarian_minimum_weight_perfect_matching};
-pub use micali_vazirani::{MicaliVazirani, MicaliVaziraniError, Phase as MicaliVaziraniPhase};
+pub use micali_vazirani::{
+    DdfsMarker, DdfsResult, MicaliVazirani, MicaliVaziraniError, Phase as MicaliVaziraniPhase,
+    TenacityQueue, VisitSource,
+};
 pub use mwpm::{FilteredEdge, WeightScaler, minimum_weight_perfect_matching};
 pub use sparse_mwpm::{SparseBlossomSolver, SparseEdge, sparse_minimum_weight_perfect_matching};
 
