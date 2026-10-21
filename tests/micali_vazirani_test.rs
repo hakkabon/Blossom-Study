@@ -14,13 +14,8 @@ fn bridge_processing_milestone_exposes_augmentation_phase() {
     let mut solver = MicaliVazirani::new(&graph);
     assert_eq!(solver.phase(), MicaliVaziraniPhase::Ready);
 
-    let error = solver.max_cardinality_matching(&graph).unwrap_err();
-    assert_eq!(
-        error,
-        MicaliVaziraniError::NotImplemented {
-            phase: MicaliVaziraniPhase::Augmentation,
-        }
-    );
+    // Milestone verification: bridge processing phase exposes Augmentation phase
+    let bottleneck = solver.run_bridge_processing_phase(&graph).unwrap();
     assert_eq!(solver.phase(), MicaliVaziraniPhase::Augmentation);
     assert!(solver.mate().iter().all(Option::is_none));
     assert_eq!(solver.even_level(), &[Some(0); 4]);
@@ -29,6 +24,14 @@ fn bridge_processing_milestone_exposes_augmentation_phase() {
     assert_eq!(solver.max_level(), &[Some(1); 4]);
     assert_eq!(solver.bridge_candidates(), &[0, 1, 2, 3]);
     assert!(solver.level_search_scans() > 0);
+    assert_eq!(bottleneck, Some(1));
+
+    // Full algorithm execution: finds maximum matching of size 2
+    let mut solver2 = MicaliVazirani::new(&graph);
+    let result = solver2.max_cardinality_matching(&graph).unwrap();
+    assert_eq!(result.edges.len(), 2);
+    assert!(result.is_perfect);
+    assert_eq!(solver2.phase(), MicaliVaziraniPhase::Finished);
 }
 
 #[test]
@@ -243,7 +246,10 @@ fn bipartite_graph_single_tree_has_no_dual_parity_levels() {
     // 2: even 2
     // 3: odd 3
     // 4: even 4
-    assert_eq!(solver.even_level(), &[Some(0), None, Some(2), None, Some(4)]);
+    assert_eq!(
+        solver.even_level(),
+        &[Some(0), None, Some(2), None, Some(4)]
+    );
     assert_eq!(solver.odd_level(), &[None, Some(1), None, Some(3), None]);
     assert!(
         solver.max_level().iter().all(Option::is_none),
@@ -388,4 +394,88 @@ fn ddfs_identifies_bottleneck_augmenting_path() {
     assert_eq!(solver.bottleneck_tenacity(), Some(5));
     assert_eq!(solver.augmenting_bridges(), &[2]);
     assert_eq!(solver.phase(), MicaliVaziraniPhase::Augmentation);
+}
+
+#[test]
+fn mv_solves_pentagon_with_tail() {
+    let graph = Graph::from_edges(
+        6,
+        vec![
+            Edge::new(0, 1, None),
+            Edge::new(1, 2, None),
+            Edge::new(2, 3, None),
+            Edge::new(3, 4, None),
+            Edge::new(4, 0, None),
+            Edge::new(0, 5, None),
+        ],
+    );
+    let mut solver = MicaliVazirani::new(&graph);
+    let result = solver.max_cardinality_matching(&graph).unwrap();
+    assert_eq!(result.edges.len(), 3);
+    assert!(result.is_perfect);
+}
+
+#[test]
+fn mv_solves_nested_blossoms() {
+    let graph = Graph::from_edges(
+        8,
+        vec![
+            Edge::new(0, 1, None),
+            Edge::new(1, 2, None),
+            Edge::new(2, 0, None),
+            Edge::new(2, 3, None),
+            Edge::new(3, 4, None),
+            Edge::new(4, 5, None),
+            Edge::new(5, 6, None),
+            Edge::new(6, 4, None),
+            Edge::new(0, 7, None),
+            Edge::new(6, 7, None),
+        ],
+    );
+    let mut solver = MicaliVazirani::new(&graph);
+    let result = solver.max_cardinality_matching(&graph).unwrap();
+    assert_eq!(result.edges.len(), 4);
+    assert!(result.is_perfect);
+}
+
+#[test]
+fn mv_matches_fast_blossom_on_complete_and_odd_graphs() {
+    use blossom_study::FastBlossomMatching;
+
+    // Test on K4
+    let k4 = Graph::from_edges(
+        4,
+        vec![
+            Edge::new(0, 1, None),
+            Edge::new(0, 2, None),
+            Edge::new(0, 3, None),
+            Edge::new(1, 2, None),
+            Edge::new(1, 3, None),
+            Edge::new(2, 3, None),
+        ],
+    );
+    let mut mv_k4 = MicaliVazirani::new(&k4);
+    let res_mv_k4 = mv_k4.max_cardinality_matching(&k4).unwrap();
+    let res_fb_k4 = FastBlossomMatching::max_cardinality_matching(&k4);
+    assert_eq!(res_mv_k4.edges.len(), res_fb_k4.edges.len());
+    assert_eq!(res_mv_k4.edges.len(), 2);
+
+    // Test on C7 (odd cycle of 7 vertices -> maximum matching size 3)
+    let c7 = Graph::from_edges(
+        7,
+        vec![
+            Edge::new(0, 1, None),
+            Edge::new(1, 2, None),
+            Edge::new(2, 3, None),
+            Edge::new(3, 4, None),
+            Edge::new(4, 5, None),
+            Edge::new(5, 6, None),
+            Edge::new(6, 0, None),
+        ],
+    );
+    let mut mv_c7 = MicaliVazirani::new(&c7);
+    let res_mv_c7 = mv_c7.max_cardinality_matching(&c7).unwrap();
+    let res_fb_c7 = FastBlossomMatching::max_cardinality_matching(&c7);
+    assert_eq!(res_mv_c7.edges.len(), res_fb_c7.edges.len());
+    assert_eq!(res_mv_c7.edges.len(), 3);
 }
