@@ -8,11 +8,11 @@ pub mod benchmark;
 pub mod graph;
 
 pub use algorithms::{
-    BlossomEngine, BlossomTreeSolver, CherryTreeSolver, FastBlossomMatching, HungarianSolver,
-    MatchingMetadata, MatchingResult, MicaliVazirani, MicaliVaziraniError, MicaliVaziraniPhase,
-    TenacityQueue, DdfsResult,
-    blossom_engine_minimum_weight_perfect_matching, blossom_tree_minimum_weight_perfect_matching,
-    cherry_tree_minimum_weight_perfect_matching, hungarian_minimum_weight_perfect_matching,
-    minimum_weight_perfect_matching, sparse_minimum_weight_perfect_matching,
+    BlossomEngine, BlossomTreeSolver, CherryTreeSolver, DdfsResult, FastBlossomMatching,
+    HungarianSolver, MatchingMetadata, MatchingResult, MicaliVazirani, MicaliVaziraniError,
+    MicaliVaziraniPhase, TenacityQueue, blossom_engine_minimum_weight_perfect_matching,
+    blossom_tree_minimum_weight_perfect_matching, cherry_tree_minimum_weight_perfect_matching,
+    hungarian_minimum_weight_perfect_matching, minimum_weight_perfect_matching,
+    sparse_minimum_weight_perfect_matching,
 };
 pub use graph::{Edge, Graph};
