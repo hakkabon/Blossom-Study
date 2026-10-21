@@ -19,12 +19,14 @@ blossom-study/
 │       ├── cherry_tree_solver.rs # Self-contained repaired Cherry-Tree solver
 │       ├── fast_blossom.rs # Active conventional cardinality baseline
 │       ├── hungarian.rs    # Bipartite assignment primal-dual solver
+│       ├── hopcroft_karp.rs # Bipartite maximum-cardinality solver
 │       ├── micali_vazirani.rs # Phased cardinality implementation
 │       ├── mwpm.rs         # Active weighted primal-dual solver adapter
 │       ├── sparse_mwpm.rs  # Sparse event-driven experiment
 │       └── korte_vygen.rs  # Reference-only implementation
 ├── tests/
 │   ├── hungarian_test.rs   # Bipartite assignment/oracle tests
+│   ├── hopcroft_karp_test.rs # Bipartite cardinality/oracle tests
 │   ├── matching.rs         # Integration and cross-implementation tests
 │   └── data/               # Test graph fixtures
 ├── bench/
@@ -37,6 +39,7 @@ blossom-study/
 
 ### Working Features
 - ✅ Maximum cardinality matching (`fast-blossom`)
+- ✅ Hopcroft–Karp bipartite maximum-cardinality matching
 - 🚧 Micali–Vazirani alternating level-search milestone
 - ✅ O(V³) minimum-weight perfect matching
 - ✅ Independent Galil/Edmonds primal-dual MWPM solver (`blossom-engine`)
@@ -100,10 +103,15 @@ cargo bench --bench matching
 The Criterion suite is divided into deliberately non-interchangeable groups:
 
 - `maximum-cardinality/general` — completed general-graph cardinality solvers.
+- `maximum-cardinality/bipartite-dense` and `maximum-cardinality/bipartite-sparse` — Hopcroft–Karp versus Fast Blossom on the same unweighted bipartite graphs.
 - `maximum-cardinality/mv-development-phase-1` — MV level search only; not an end-to-end matching result.
 - `minimum-weight-perfect/general-dense` — all general MWPM solvers on complete graphs.
 - `minimum-weight-perfect/general-sparse` — the same solvers on planted sparse instances.
 - `minimum-weight-perfect/bipartite-dense` — Hungarian plus every general MWPM solver on identical assignment graphs.
+
+The Hopcroft–Karp and Hungarian groups deliberately report different objectives:
+maximum *cardinality* versus minimum *weight among perfect matchings*. Their
+numbers should not be read as head-to-head timings for the same task.
 
 Hungarian requires an explicit balanced bipartition. The public convention is
 left vertices `0..k` and right vertices `k..2k`:
@@ -112,6 +120,19 @@ left vertices `0..k` and right vertices `k..2k`:
 use blossom_study::hungarian_minimum_weight_perfect_matching;
 
 let result = hungarian_minimum_weight_perfect_matching(&graph, k)?;
+```
+
+Hopcroft–Karp uses the same contiguous partition convention but allows unequal
+side sizes: left vertices are `0..left_size`, and the remaining vertices are
+right vertices. It returns a maximum matching even when a perfect matching is
+impossible. Edge weights are ignored when selecting the matching; the result's
+`total_weight` merely sums the selected edges for consistency with the shared
+result type.
+
+```rust
+use blossom_study::hopcroft_karp_maximum_cardinality_matching;
+
+let result = hopcroft_karp_maximum_cardinality_matching(&graph, left_size)?;
 ```
 
 ## Algorithm Details
@@ -137,10 +158,17 @@ minimum slack for each unreached right vertex. No odd-set duals or blossom
 contractions are needed. Randomized tests compare it against the general MWPM
 baseline on the same graphs.
 
+Hopcroft–Karp is the bipartite cardinality baseline. A multi-source BFS layers
+all exposed left vertices, and iterative DFS finds a maximal collection of
+shortest augmenting paths in each phase. It runs in `O(E sqrt(V))` time and
+`O(V + E)` space; exhaustive small-graph tests compare its answer with an
+independent brute-force cardinality oracle.
+
 Key components:
 - **Fast Blossom** - DSU contraction with timestamp-based LCA
 - **Micali–Vazirani track** - alternating even/odd levels and preliminary prop/bridge classification; later phases remain explicit rather than using a fallback
 - **Hungarian assignment** - O(k³) bipartite primal-dual shortest augmenting paths with exact cost scaling
+- **Hopcroft–Karp** - O(E sqrt(V)) unweighted bipartite maximum-cardinality matching
 - **Primal-dual weighted matching** - O(V³), with exact dual arithmetic and sparse-graph support
 - **Blossom Engine** - independent, extensively commented Galil/Edmonds primal-dual implementation
 - **Blossom Tree** - MIT-attributed flat-containment adaptation with immutable contraction history
@@ -165,5 +193,6 @@ Key components:
 - Galil, Z. (1986). Efficient Algorithms for Finding Maximum Matching in Graphs. *ACM Computing Surveys*, 18(1), 23–38. https://doi.org/10.1145/6462.6502
 - Kuhn, H.W. (1955). The Hungarian method for the assignment problem. *Naval Research Logistics Quarterly*, 2, 83–97.
 - Micali, S., & Vazirani, V.V. (1980). An O(sqrt(V)E) algorithm for finding maximum matching in general graphs. *FOCS 1980*, 17–27.
+- Hopcroft, J.E., & Karp, R.M. (1973). An n^(5/2) algorithm for maximum matchings in bipartite graphs. *SIAM Journal on Computing*, 2(4), 225–231.
 - Kolmogorov, V. (2009). Blossom V: A new implementation of a minimum cost perfect matching algorithm. *Mathematical Programming Computation*, 1(1), 43-67.
 - Arkhipov, P., & Kolmogorov, V. (2026). Blossom VI. *arXiv preprint*.

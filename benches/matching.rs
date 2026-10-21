@@ -1,5 +1,5 @@
 use blossom_study::{
-    algorithms::{FastBlossomMatching, MicaliVazirani},
+    algorithms::{FastBlossomMatching, MicaliVazirani, hopcroft_karp_maximum_cardinality_matching},
     graph::{Edge, Graph, generator},
 };
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -175,6 +175,81 @@ fn complete_bipartite_graph(partition_size: usize) -> Graph {
     Graph::from_edges(2 * partition_size, edges)
 }
 
+/// Keep the same bipartite topology as the weighted assignment benchmark,
+/// but remove costs: Hopcroft–Karp and Fast Blossom solve a cardinality
+/// problem, not the minimum-cost assignment problem solved by Hungarian.
+fn unweighted_bipartite_graph(weighted: &Graph) -> Graph {
+    Graph::from_edges(
+        weighted.n,
+        weighted
+            .edges
+            .iter()
+            .map(|edge| Edge::new(edge.u, edge.v, None))
+            .collect(),
+    )
+}
+
+/// A sparse, planted-perfect bipartite instance with O(k) edges. The planted
+/// diagonal guarantees a full matching while the chords create choices that
+/// exercise alternating BFS/DFS beyond an isolated set of edges.
+fn sparse_bipartite_graph(partition_size: usize) -> Graph {
+    let mut edges = Vec::with_capacity(3 * partition_size);
+    for left in 0..partition_size {
+        let mut rights = [
+            left,
+            (left + 1) % partition_size,
+            (left * 7 + 3) % partition_size,
+        ];
+        rights.sort_unstable();
+        for (index, &right) in rights.iter().enumerate() {
+            if index == 0 || right != rights[index - 1] {
+                edges.push(Edge::new(left, partition_size + right, None));
+            }
+        }
+    }
+    Graph::from_edges(2 * partition_size, edges)
+}
+
+fn cardinality_benchmarks_bipartite(c: &mut Criterion) {
+    for (shape, sizes) in [("dense", [10, 25, 50, 100]), ("sparse", [10, 25, 50, 100])] {
+        let mut group = c.benchmark_group(format!("maximum-cardinality/bipartite-{shape}"));
+        for partition_size in sizes {
+            let graph = if shape == "dense" {
+                unweighted_bipartite_graph(&complete_bipartite_graph(partition_size))
+            } else {
+                sparse_bipartite_graph(partition_size)
+            };
+            // Keep correctness checks outside the timed closures. Both
+            // algorithms must solve the same cardinality instance before a
+            // speed comparison is meaningful.
+            let hopcroft_karp = hopcroft_karp_maximum_cardinality_matching(&graph, partition_size)
+                .expect("generated graph must respect its bipartition");
+            let fast_blossom = FastBlossomMatching::max_cardinality_matching(&graph);
+            assert_eq!(hopcroft_karp.edges.len(), fast_blossom.edges.len());
+            assert_eq!(hopcroft_karp.edges.len(), partition_size);
+            let parameter = format!("{partition_size}+{partition_size}");
+            group.bench_with_input(
+                BenchmarkId::new("hopcroft-karp", &parameter),
+                &graph,
+                |b, graph| {
+                    b.iter(|| {
+                        hopcroft_karp_maximum_cardinality_matching(graph, partition_size)
+                            .expect("generated graph must respect its bipartition")
+                    });
+                },
+            );
+            group.bench_with_input(
+                BenchmarkId::new("fast-blossom", &parameter),
+                &graph,
+                |b, graph| {
+                    b.iter(|| FastBlossomMatching::max_cardinality_matching(graph));
+                },
+            );
+        }
+        group.finish();
+    }
+}
+
 fn weighted_benchmarks_bipartite(c: &mut Criterion) {
     let mut group = c.benchmark_group("minimum-weight-perfect/bipartite-dense");
     for partition_size in [10, 25, 50, 100] {
@@ -241,6 +316,7 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
 criterion_group!(
     benches,
     cardinality_benchmarks,
+    cardinality_benchmarks_bipartite,
     weighted_benchmarks_dense,
     weighted_benchmarks_sparse,
     weighted_benchmarks_bipartite
