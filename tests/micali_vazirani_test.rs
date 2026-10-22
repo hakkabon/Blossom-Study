@@ -1,4 +1,6 @@
-use blossom_study::{Edge, Graph, MicaliVazirani, MicaliVaziraniError, MicaliVaziraniPhase};
+use blossom_study::{
+    DdfsResult, Edge, Graph, MicaliVazirani, MicaliVaziraniError, MicaliVaziraniPhase,
+};
 
 #[test]
 fn bridge_processing_milestone_exposes_augmentation_phase() {
@@ -478,4 +480,191 @@ fn mv_matches_fast_blossom_on_complete_and_odd_graphs() {
     let res_fb_c7 = FastBlossomMatching::max_cardinality_matching(&c7);
     assert_eq!(res_mv_c7.edges.len(), res_fb_c7.edges.len());
     assert_eq!(res_mv_c7.edges.len(), 3);
+}
+
+/// The greedy first phase may choose 1--3. The next phase must recognize the
+/// matched middle edge as a bridge of tenacity three and augment on
+/// 0--3==1--2, obtaining the perfect matching {0--3, 1--2}.
+#[test]
+fn matched_bridge_on_four_vertex_path_is_not_a_false_optimum() {
+    let graph = Graph::from_edges(
+        4,
+        vec![
+            Edge::new(0, 3, None),
+            Edge::new(1, 2, None),
+            Edge::new(1, 3, None),
+        ],
+    );
+
+    let initial = vec![None, Some(3), None, Some(1)];
+    let mut from_initial = MicaliVazirani::with_matching(&graph, initial).unwrap();
+    assert_eq!(
+        from_initial.run_interleaved_search_phase(&graph).unwrap(),
+        Some(3)
+    );
+    assert_eq!(from_initial.bridge_tenacity(&graph, 2), Some(3));
+    // DDFS must not accept a forged tenacity as a certificate.
+    assert_eq!(from_initial.ddfs(&graph, 2, 5), DdfsResult::Redundant);
+    let mut from_initial =
+        MicaliVazirani::with_matching(&graph, vec![None, Some(3), None, Some(1)]).unwrap();
+    assert_eq!(
+        from_initial
+            .max_cardinality_matching(&graph)
+            .unwrap()
+            .edges
+            .len(),
+        2
+    );
+
+    let mut from_empty = MicaliVazirani::new(&graph);
+    let result = from_empty.max_cardinality_matching(&graph).unwrap();
+    assert_eq!(result.edges.len(), 2);
+    assert!(result.is_perfect);
+}
+
+/// A first petal must activate its MAX-level vertices; the resulting second
+/// petal must be lifted into actual graph edges before the length-seven path
+/// can be used. This once terminated with only three matched pairs.
+#[test]
+fn nested_petals_are_unrolled_to_an_actual_augmenting_path() {
+    let pairs = [
+        (0, 7),
+        (1, 2),
+        (1, 3),
+        (1, 4),
+        (1, 7),
+        (2, 3),
+        (2, 4),
+        (2, 5),
+        (3, 4),
+        (3, 5),
+        (3, 7),
+        (4, 5),
+        (4, 6),
+        (6, 7),
+    ];
+    let graph = Graph::from_edges(
+        8,
+        pairs.iter().map(|&(u, v)| Edge::new(u, v, None)).collect(),
+    );
+    let initial = vec![
+        None,
+        None,
+        Some(3),
+        Some(2),
+        Some(5),
+        Some(4),
+        Some(7),
+        Some(6),
+    ];
+    let mut solver = MicaliVazirani::with_matching(&graph, initial).unwrap();
+    let result = solver.max_cardinality_matching(&graph).unwrap();
+    assert_eq!(result.edges.len(), 4);
+    assert!(result.is_perfect);
+}
+
+/// This deeper case still exceeds the current DDFS/petal search. Keep it as a
+/// permanent fail-closed regression: the solver must not return a false
+/// "maximum" while a length-nine augmenting path remains.
+#[test]
+fn missed_nested_petal_reports_uncertified_optimality() {
+    let pairs = [
+        (0, 1),
+        (0, 4),
+        (1, 2),
+        (1, 4),
+        (1, 5),
+        (2, 5),
+        (2, 6),
+        (2, 8),
+        (3, 7),
+        (4, 5),
+        (4, 9),
+        (5, 8),
+        (5, 9),
+        (6, 7),
+    ];
+    let graph = Graph::from_edges(
+        10,
+        pairs.iter().map(|&(u, v)| Edge::new(u, v, None)).collect(),
+    );
+    let initial = vec![
+        None,
+        Some(4),
+        Some(8),
+        None,
+        Some(1),
+        Some(9),
+        Some(7),
+        Some(6),
+        Some(2),
+        Some(5),
+    ];
+    let mut solver = MicaliVazirani::with_matching(&graph, initial).unwrap();
+    assert!(matches!(
+        solver.max_cardinality_matching(&graph),
+        Err(MicaliVaziraniError::UncertifiedOptimality { path_length: 9 })
+    ));
+}
+
+/// Exact, deliberately exponential oracle for the tiny exhaustive suite.
+fn brute_maximum_cardinality(n: usize, edges: &[(usize, usize)], used: u64) -> usize {
+    let Some(u) = (0..n).find(|&v| used & (1 << v) == 0) else {
+        return 0;
+    };
+    let without_u = used | (1 << u);
+    let mut best = brute_maximum_cardinality(n, edges, without_u);
+    for &(a, b) in edges {
+        let v = if a == u {
+            b
+        } else if b == u {
+            a
+        } else {
+            continue;
+        };
+        if used & (1 << v) == 0 {
+            best = best.max(1 + brute_maximum_cardinality(n, edges, without_u | (1 << v)));
+        }
+    }
+    best
+}
+
+/// Covers every simple graph through six vertices, including disconnected,
+/// bipartite, odd-cycle, and blossom-containing cases. In addition to size,
+/// check mate symmetry and that every selected pair is an actual graph edge.
+#[test]
+fn mv_agrees_with_exhaustive_small_graph_oracle() {
+    for n in 0..=6 {
+        let possible_edges: Vec<_> = (0..n)
+            .flat_map(|u| (u + 1..n).map(move |v| (u, v)))
+            .collect();
+        for mask in 0..(1_u64 << possible_edges.len()) {
+            let chosen: Vec<_> = possible_edges
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| mask & (1 << index) != 0)
+                .map(|(_, &pair)| pair)
+                .collect();
+            let graph = Graph::from_edges(
+                n,
+                chosen.iter().map(|&(u, v)| Edge::new(u, v, None)).collect(),
+            );
+            let expected = brute_maximum_cardinality(n, &chosen, 0);
+            let mut solver = MicaliVazirani::new(&graph);
+            let result = solver.max_cardinality_matching(&graph).unwrap();
+            assert_eq!(
+                result.edges.len(),
+                expected,
+                "n={n}, mask={mask}, edges={chosen:?}"
+            );
+            assert_eq!(result.is_perfect, expected * 2 == n);
+            for (u, mate) in solver.mate().iter().enumerate() {
+                if let Some(v) = mate {
+                    assert_ne!(u, *v);
+                    assert_eq!(solver.mate()[*v], Some(u));
+                    assert!(chosen.contains(&(u.min(*v), u.max(*v))));
+                }
+            }
+        }
+    }
 }

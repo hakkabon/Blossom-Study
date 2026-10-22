@@ -9,7 +9,7 @@ use rustyline::DefaultEditor;
 pub enum Algorithm {
     /// Fast Blossom (DSU with timestamp LCA)
     FastBlossom,
-    /// Phased Micali–Vazirani implementation (level search milestone)
+    /// Experimental phased Micali–Vazirani solver (may reject uncertified results)
     MicaliVazirani,
 }
 

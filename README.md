@@ -40,7 +40,7 @@ blossom-study/
 ### Working Features
 - ✅ Maximum cardinality matching (`fast-blossom`)
 - ✅ Hopcroft–Karp bipartite maximum-cardinality matching
-- 🚧 Micali–Vazirani alternating level-search milestone
+- 🚧 Experimental phased Micali–Vazirani cardinality solver, with certified augmentations
 - ✅ O(V³) minimum-weight perfect matching
 - ✅ Independent Galil/Edmonds primal-dual MWPM solver (`blossom-engine`)
 - ✅ Flat-containment Blossom-Tree solver (`blossom-tree`)
@@ -53,7 +53,7 @@ blossom-study/
 - ✅ Criterion and CLI benchmark frameworks
 
 ### Known Limitations
-- ⚠️ Micali–Vazirani now discovers alternating parity levels and prop/bridge candidates, but DDFS, tenacity-ordered bridge processing, petals, set merging, and augmentation remain incomplete
+- ⚠️ Micali–Vazirani now handles matched and unmatched bridges, DDFS petal certificates, and shortest augmenting-path checks. Nested-petal discovery is still incomplete: on a known ten-vertex graph it returns `UncertifiedOptimality` instead of claiming a false maximum. Exact certificate searches can take exponential time, so the implementation does **not** yet have MV's `O(E sqrt(V))` bound.
 - ⚠️ Weighted solver metadata currently reports runtime but not its internal contractions or dual updates
 - ⚠️ Cherry-Tree and Blossom Engine implement the same Edmonds/Galil primal-dual framework with separate solver state; benchmark differences therefore reflect implementation structure rather than different asymptotic complexity
 - ⚠️ SparseBlossomSolver targets `O(VE)` behavior, but its contraction-map rebuilding has not received a formal amortized analysis
@@ -166,7 +166,7 @@ independent brute-force cardinality oracle.
 
 Key components:
 - **Fast Blossom** - DSU contraction with timestamp-based LCA
-- **Micali–Vazirani track** - alternating even/odd levels and preliminary prop/bridge classification; later phases remain explicit rather than using a fallback
+- **Micali–Vazirani track** - experimental phased cardinality search, with matched-bridge handling and explicit path/petal validation; a separate exact oracle only rejects incorrect shortestness or termination claims and never supplies a fallback matching
 - **Hungarian assignment** - O(k³) bipartite primal-dual shortest augmenting paths with exact cost scaling
 - **Hopcroft–Karp** - O(E sqrt(V)) unweighted bipartite maximum-cardinality matching
 - **Primal-dual weighted matching** - O(V³), with exact dual arithmetic and sparse-graph support

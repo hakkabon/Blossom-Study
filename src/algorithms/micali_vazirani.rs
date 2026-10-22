@@ -1,4 +1,4 @@
-//! Complete phased implementation of Micali–Vazirani (MV) maximum-cardinality matching.
+//! Experimental phased Micali–Vazirani (MV) maximum-cardinality matching.
 //!
 //! # Algorithmic Foundations
 //!
@@ -27,9 +27,11 @@
 //!    Bridges are processed strictly in non-decreasing tenacity order in $O(1)$ amortized time.
 //!
 //! 4. **Double Depth-First Search (DDFS)**:
-//!    Backward lockstep traversal along predecessor edges from bridge endpoints to find their
-//!    Lowest Common Ancestor (base of petal) in $O(\text{cycle})$ time, with destructive prop
-//!    consumption guaranteeing the $O(E)$ per-phase bound.
+//!    Backward traversal along predecessor edges from bridge endpoints proposes a petal.
+//!    Its certificate is checked against actual graph edges before contraction. The current
+//!    implementation also enumerates alternating paths/cycles when prop reconstruction is
+//!    insufficient. This makes it a correctness-first experiment, **not** an implementation
+//!    with MV's proven $O(E)$ per-phase bound.
 //!
 //! 5. **Interleaved Search & Dynamic Enqueuing**:
 //!    As petals form at tenacity $T$, vertices receiving `max_level` are re-enqueued to propagate
@@ -40,8 +42,9 @@
 //!    augmenting paths, flipping matched edges in $O(L)$ time.
 //!
 //! 7. **Termination (Berge's Lemma)**:
-//!    When a phase finds no augmenting bridge, no augmenting path exists in $G$, proving that
-//!    the matching is optimal (maximum cardinality).
+//!    The phase's failure to find a bridge is not yet a proof of optimality here: nested-petal
+//!    discovery is incomplete. An independent exact alternating-path search checks the claim
+//!    and returns an error if the phased search missed a path. It is exponential in general.
 
 use crate::algorithms::{MatchingMetadata, MatchingResult};
 use crate::graph::Graph;
@@ -65,7 +68,22 @@ pub enum Phase {
 pub enum MicaliVaziraniError {
     GraphChanged,
     InvalidMatching,
-    NotImplemented { phase: Phase },
+    NotImplemented {
+        phase: Phase,
+    },
+    /// A shorter augmenting path disproves the proposed phase bottleneck.
+    NonShortestAugmentation {
+        proposed: usize,
+        actual: usize,
+    },
+    /// An augmenting path remains although the phased search declared completion.
+    UncertifiedOptimality {
+        path_length: usize,
+    },
+    /// A claimed bottleneck yielded no certified path to augment.
+    MissingAugmentation {
+        tenacity: usize,
+    },
 }
 
 impl fmt::Display for MicaliVaziraniError {
@@ -78,6 +96,18 @@ impl fmt::Display for MicaliVaziraniError {
             Self::NotImplemented { phase } => write!(
                 formatter,
                 "Micali–Vazirani phase {phase:?} is not implemented yet"
+            ),
+            Self::NonShortestAugmentation { proposed, actual } => write!(
+                formatter,
+                "proposed augmentation length {proposed} is not shortest; found length {actual}"
+            ),
+            Self::UncertifiedOptimality { path_length } => write!(
+                formatter,
+                "phased search missed an augmenting path of length {path_length}"
+            ),
+            Self::MissingAugmentation { tenacity } => write!(
+                formatter,
+                "no certified augmentation for claimed bottleneck tenacity {tenacity}"
             ),
         }
     }
@@ -367,9 +397,20 @@ impl MicaliVazirani {
 
     pub fn bridge_tenacity(&self, graph: &Graph, edge_index: usize) -> Option<usize> {
         let edge = graph.edges.get(edge_index)?;
-        let u_even = self.even_level.get(edge.u)?.as_ref()?;
-        let v_even = self.even_level.get(edge.v)?.as_ref()?;
-        Some(*u_even + *v_even + 1)
+        // A bridge may itself belong to the current matching. The two cases
+        // meet different alternating-path parities at their endpoints.
+        let (u_level, v_level) = if self.mate[edge.u] == Some(edge.v) {
+            (
+                *self.odd_level.get(edge.u)?.as_ref()?,
+                *self.odd_level.get(edge.v)?.as_ref()?,
+            )
+        } else {
+            (
+                *self.even_level.get(edge.u)?.as_ref()?,
+                *self.even_level.get(edge.v)?.as_ref()?,
+            )
+        };
+        u_level.checked_add(v_level)?.checked_add(1)
     }
 
     pub fn level_search_scans(&self) -> usize {
@@ -404,10 +445,11 @@ impl MicaliVazirani {
     // PRIMARY ENTRY POINT: Solve Maximum Cardinality Matching
     // =========================================================================
 
-    /// Computes a maximum-cardinality matching using the full Micali–Vazirani algorithm.
+    /// Attempts a maximum-cardinality matching using the experimental MV phases.
     ///
-    /// Executes sequential phases until no augmenting paths of any length exist.
-    /// By Berge's Lemma, absence of augmenting paths certifies maximum cardinality.
+    /// An independent, exact path oracle checks shortestness before every flip and
+    /// optimality at termination. A failed check returns an error rather than a
+    /// silently nonmaximum result. This intentionally postpones the time bound.
     pub fn max_cardinality_matching(
         &mut self,
         graph: &Graph,
@@ -425,15 +467,22 @@ impl MicaliVazirani {
             // Run the interleaved level search & bridge processing phase
             let bottleneck = self.run_interleaved_search_phase(graph)?;
 
-            // If no augmenting path exists, the matching is MAXIMUM (Berge's Lemma)
+            // The search can still miss a bridge inside nested petals. Check
+            // Berge's condition independently before calling the result maximum.
             let Some(tenacity) = bottleneck else {
+                if let Some(path) = self.shortest_augmenting_path(graph, graph.n.saturating_sub(1))
+                {
+                    return Err(MicaliVaziraniError::UncertifiedOptimality {
+                        path_length: path.len() - 1,
+                    });
+                }
                 break;
             };
 
             // Augment along a maximal collection of vertex-disjoint paths of length 'tenacity'
-            let paths_augmented = self.run_augmentation_phase(graph, tenacity);
+            let paths_augmented = self.run_augmentation_phase(graph, tenacity)?;
             if paths_augmented == 0 {
-                break;
+                return Err(MicaliVaziraniError::MissingAugmentation { tenacity });
             }
             self.total_augmentations += paths_augmented;
             self.total_blossoms_created += self.petals.len();
@@ -536,7 +585,21 @@ impl MicaliVazirani {
                     if let Some(v) = self.mate[u] {
                         self.level_search_scans += 1;
                         let next_lvl = current_level + 1;
-                        if self.even_level[v].is_none() {
+                        // If the mate already has a shorter MIN-level path,
+                        // this matched edge is a bridge, not a predecessor.
+                        // In particular, two odd-level-one vertices reached
+                        // from distinct free roots can be joined this way.
+                        if self.min_level[v].is_some_and(|level| level < next_lvl) {
+                            if let Some(edge_idx) = graph.edge_index(u, v)
+                                && let Some(tenacity) = self.bridge_tenacity(graph, edge_idx)
+                            {
+                                if !bridge_queued[edge_idx] {
+                                    bridge_queued[edge_idx] = true;
+                                    tenacity_queue.push(edge_idx, tenacity);
+                                    self.bridges.push(edge_idx);
+                                }
+                            }
+                        } else if self.even_level[v].is_none() {
                             self.even_level[v] = Some(next_lvl);
                             if self.min_level[v].is_none() {
                                 self.min_level[v] = Some(next_lvl);
@@ -710,7 +773,9 @@ impl MicaliVazirani {
             }
 
             match self.ddfs(graph, edge_idx, tenacity) {
-                DdfsResult::Petal { .. } => {}
+                DdfsResult::Petal { cycle_vertices, .. } => {
+                    self.assign_petal_max_levels(&cycle_vertices, tenacity)
+                }
                 DdfsResult::AugmentingPath { bridge_edge, .. } => {
                     if self.bottleneck_tenacity.is_none() {
                         self.bottleneck_tenacity = Some(tenacity);
@@ -738,12 +803,38 @@ impl MicaliVazirani {
     /// - Skipping already-contracted petals via `find_petal_base`;
     /// - Consuming predecessor edges destructively so no edge is rescanned in the phase.
     pub fn ddfs(&mut self, graph: &Graph, bridge_index: usize, tenacity: usize) -> DdfsResult {
+        // A caller-supplied tenacity is not itself a certificate. Reject an
+        // edge whose currently known parity levels disagree with it before
+        // mutating the petal partition or predecessor scan pointers.
+        if self.bridge_tenacity(graph, bridge_index) != Some(tenacity) || tenacity % 2 == 0 {
+            return DdfsResult::Redundant;
+        }
         let edge = &graph.edges[bridge_index];
         let mut curr_u = self.find_petal_base(edge.u);
         let mut curr_v = self.find_petal_base(edge.v);
 
         if curr_u == curr_v {
             return DdfsResult::Redundant;
+        }
+
+        // A bridge can have several predecessor choices. Before contracting
+        // anything, try to produce an actual simple, alternating path of the
+        // prescribed tenacity through this bridge. A single arbitrary DDFS
+        // predecessor branch may meet at a blossom base even though another
+        // branch reaches a distinct exposed root (the four-vertex path is the
+        // smallest example). This certificate search prioritizes correctness;
+        // its cost is not covered by the claimed MV linear-per-phase bound.
+        if let Some(path) =
+            self.certified_augmenting_path(graph, bridge_index, tenacity, &vec![false; graph.n])
+        {
+            let (left_path, right_path) = self.path_halves_around_bridge(&path, edge.u, edge.v);
+            return DdfsResult::AugmentingPath {
+                bridge_edge: bridge_index,
+                root_left: *left_path.last().expect("certified path has a left root"),
+                root_right: *right_path.last().expect("certified path has a right root"),
+                left_path,
+                right_path,
+            };
         }
 
         self.ddfs_epoch += 1;
@@ -783,14 +874,22 @@ impl MicaliVazirani {
                                     cycle_vertices.push(w);
                                 }
                             }
-                            self.union_petal(base_pred, &cycle_vertices);
-                            self.assign_petal_max_levels(&cycle_vertices, tenacity);
-                            return DdfsResult::Petal {
-                                base: base_pred,
+                            if let Some(cycle_vertices) = self.certified_petal_cycle(
+                                graph,
+                                bridge_index,
+                                tenacity,
+                                base_pred,
                                 cycle_vertices,
-                                path_u,
-                                path_v,
-                            };
+                            ) {
+                                self.union_petal(base_pred, &cycle_vertices);
+                                return DdfsResult::Petal {
+                                    base: base_pred,
+                                    cycle_vertices,
+                                    path_u,
+                                    path_v,
+                                };
+                            }
+                            return DdfsResult::Redundant;
                         }
                     } else {
                         self.ddfs_markers[base_pred] = DdfsMarker {
@@ -822,14 +921,22 @@ impl MicaliVazirani {
                                     cycle_vertices.push(w);
                                 }
                             }
-                            self.union_petal(base_pred, &cycle_vertices);
-                            self.assign_petal_max_levels(&cycle_vertices, tenacity);
-                            return DdfsResult::Petal {
-                                base: base_pred,
+                            if let Some(cycle_vertices) = self.certified_petal_cycle(
+                                graph,
+                                bridge_index,
+                                tenacity,
+                                base_pred,
                                 cycle_vertices,
-                                path_u,
-                                path_v,
-                            };
+                            ) {
+                                self.union_petal(base_pred, &cycle_vertices);
+                                return DdfsResult::Petal {
+                                    base: base_pred,
+                                    cycle_vertices,
+                                    path_u,
+                                    path_v,
+                                };
+                            }
+                            return DdfsResult::Redundant;
                         }
                     } else {
                         self.ddfs_markers[base_pred] = DdfsMarker {
@@ -843,17 +950,156 @@ impl MicaliVazirani {
                 }
             }
 
-            // If both reached exposed roots without meeting: augmenting path found!
+            // Exhausting two arbitrary predecessor branches is not by itself
+            // an augmenting-path certificate. The certified search above
+            // already tried every compatible branch through this bridge.
             if !u_active && !v_active {
-                return DdfsResult::AugmentingPath {
-                    bridge_edge: bridge_index,
-                    root_left: curr_u,
-                    root_right: curr_v,
-                    left_path: path_u,
-                    right_path: path_v,
-                };
+                return DdfsResult::Redundant;
             }
         }
+    }
+
+    /// Check the explicit odd cycle before treating it as a contracted petal.
+    /// In particular, a DSU representative sequence that skips internal edges
+    /// of a nested blossom is *not* silently accepted as a cycle in G.
+    fn valid_petal_cycle(
+        &self,
+        graph: &Graph,
+        bridge_index: usize,
+        base: usize,
+        cycle: &[usize],
+    ) -> bool {
+        if cycle.len() < 3 || cycle.len() % 2 == 0 || !cycle.contains(&base) {
+            return false;
+        }
+        let mut seen = vec![false; graph.n];
+        for &vertex in cycle {
+            if vertex >= graph.n || seen[vertex] {
+                return false;
+            }
+            seen[vertex] = true;
+        }
+        let bridge = &graph.edges[bridge_index];
+        let mut contains_bridge = false;
+        for i in 0..cycle.len() {
+            let u = cycle[i];
+            let v = cycle[(i + 1) % cycle.len()];
+            if graph.edge_index(u, v).is_none() {
+                return false;
+            }
+            if (u == bridge.u && v == bridge.v) || (u == bridge.v && v == bridge.u) {
+                contains_bridge = true;
+            }
+            // Every non-base vertex must have exactly one matched cycle edge;
+            // the base may be matched outside the petal, but not within it.
+            if u != base {
+                let prev = cycle[(i + cycle.len() - 1) % cycle.len()];
+                let matched_incident =
+                    usize::from(self.mate[u] == Some(prev)) + usize::from(self.mate[u] == Some(v));
+                if matched_incident != 1 {
+                    return false;
+                }
+            } else if self.mate[u] == Some(v)
+                || self.mate[u] == Some(cycle[(i + cycle.len() - 1) % cycle.len()])
+            {
+                return false;
+            }
+        }
+        contains_bridge
+    }
+
+    /// A quotient-graph DDFS can jump over the interior of an existing petal.
+    /// Its representative sequence then is not an original-graph cycle. To
+    /// certify the contraction, lift that sequence by looking for a concrete
+    /// odd alternating cycle with the same base and bridge. This is a
+    /// correctness-first reconstruction and can be expensive; it is not the
+    /// incremental-tree/stack set-merging procedure of linear-time MV.
+    fn certified_petal_cycle(
+        &self,
+        graph: &Graph,
+        bridge_index: usize,
+        tenacity: usize,
+        base: usize,
+        representative_cycle: Vec<usize>,
+    ) -> Option<Vec<usize>> {
+        let base_distance = self.min_level[base]?;
+        if base_distance % 2 != 0 {
+            return None;
+        }
+        let cycle_len = tenacity.checked_sub(base_distance.checked_mul(2)?)?;
+        if cycle_len < 3 || cycle_len % 2 == 0 || cycle_len > graph.n {
+            return None;
+        }
+        if representative_cycle.len() == cycle_len
+            && self.valid_petal_cycle(graph, bridge_index, base, &representative_cycle)
+        {
+            return Some(representative_cycle);
+        }
+        let mut seen = vec![false; graph.n];
+        seen[base] = true;
+        let mut path = vec![base];
+        self.find_petal_cycle(
+            graph,
+            bridge_index,
+            base,
+            base,
+            cycle_len,
+            false,
+            &mut seen,
+            &mut path,
+        )
+    }
+
+    fn find_petal_cycle(
+        &self,
+        graph: &Graph,
+        bridge_index: usize,
+        base: usize,
+        current: usize,
+        edges_remaining: usize,
+        expect_matched: bool,
+        seen: &mut [bool],
+        path: &mut Vec<usize>,
+    ) -> Option<Vec<usize>> {
+        let bridge = &graph.edges[bridge_index];
+        for &edge_index in graph.adj_edges(current) {
+            let edge = &graph.edges[edge_index];
+            let next = if edge.u == current { edge.v } else { edge.u };
+            if (self.mate[current] == Some(next)) != expect_matched {
+                continue;
+            }
+            if edges_remaining == 1 {
+                if next != base {
+                    continue;
+                }
+                let contains_bridge = path.windows(2).any(|pair| {
+                    (pair[0] == bridge.u && pair[1] == bridge.v)
+                        || (pair[0] == bridge.v && pair[1] == bridge.u)
+                }) || (current == bridge.u && base == bridge.v)
+                    || (current == bridge.v && base == bridge.u);
+                if contains_bridge && self.valid_petal_cycle(graph, bridge_index, base, path) {
+                    return Some(path.clone());
+                }
+            } else if next != base && !seen[next] {
+                seen[next] = true;
+                path.push(next);
+                if let Some(cycle) = self.find_petal_cycle(
+                    graph,
+                    bridge_index,
+                    base,
+                    next,
+                    edges_remaining - 1,
+                    !expect_matched,
+                    seen,
+                    path,
+                ) {
+                    return Some(cycle);
+                }
+                path.pop();
+                seen[next] = false;
+            }
+        }
+        None
     }
 
     fn advance_ddfs_step(&mut self, graph: &Graph, vertex: usize) -> Option<usize> {
@@ -921,7 +1167,11 @@ impl MicaliVazirani {
     /// 3. **Disjointness Invariant**: Vertices included in any augmented path are marked in
     ///    `committed_in_aug`. Any subsequent candidate bridge whose unrolled path intersects
     ///    an already committed vertex is bypassed, ensuring non-overlapping augmentations.
-    pub fn run_augmentation_phase(&mut self, graph: &Graph, _bottleneck_tenacity: usize) -> usize {
+    pub fn run_augmentation_phase(
+        &mut self,
+        graph: &Graph,
+        bottleneck_tenacity: usize,
+    ) -> Result<usize, MicaliVaziraniError> {
         self.phase = Phase::Augmentation;
         let mut augmentations = 0;
 
@@ -934,30 +1184,110 @@ impl MicaliVazirani {
             }
 
             // Attempt to unroll a complete alternating path to distinct exposed roots
-            if let Some(path) = self.reconstruct_augmenting_path(graph, bridge_idx) {
+            if let Some(path) = self.certified_augmenting_path(
+                graph,
+                bridge_idx,
+                bottleneck_tenacity,
+                &self.committed_in_aug,
+            ) {
                 // Ensure strictly vertex-disjoint paths in this phase
                 if path.iter().all(|&w| !self.committed_in_aug[w]) {
+                    // A path of the queue's least bridge tenacity is only a
+                    // *candidate* shortest path. Verify that no shorter
+                    // augmenting path exists in the current matching before
+                    // modifying any mate. This is intentionally exact and
+                    // expensive while the MV layering proof is unfinished.
+                    if bottleneck_tenacity > 1
+                        && let Some(shorter) =
+                            self.shortest_augmenting_path(graph, bottleneck_tenacity - 2)
+                    {
+                        return Err(MicaliVaziraniError::NonShortestAugmentation {
+                            proposed: bottleneck_tenacity,
+                            actual: shorter.len() - 1,
+                        });
+                    }
                     self.apply_augmentation(&path);
                     augmentations += 1;
                 }
             }
         }
 
-        augmentations
+        Ok(augmentations)
+    }
+
+    /// Independent certificate oracle, used only to *reject* invalid phase
+    /// claims. It never supplies a replacement augmentation to the MV search.
+    /// Enumerating simple alternating paths is exponential in the worst case.
+    fn shortest_augmenting_path(&self, graph: &Graph, maximum_length: usize) -> Option<Vec<usize>> {
+        if maximum_length == 0 || self.mate.iter().filter(|mate| mate.is_none()).count() < 2 {
+            return None;
+        }
+        let upper = maximum_length.min(graph.n.saturating_sub(1));
+        for length in (1..=upper).step_by(2) {
+            for root in 0..graph.n {
+                if self.mate[root].is_some() {
+                    continue;
+                }
+                let mut seen = vec![false; graph.n];
+                seen[root] = true;
+                let mut path = vec![root];
+                if self.find_exact_augmenting_path(graph, root, length, false, &mut seen, &mut path)
+                {
+                    return Some(path);
+                }
+            }
+        }
+        None
+    }
+
+    /// `expect_matched` describes the next edge, not the parity of `current`.
+    /// The visited set enforces the simple-path requirement that parity-state
+    /// BFS alone cannot enforce in a general (non-bipartite) graph.
+    fn find_exact_augmenting_path(
+        &self,
+        graph: &Graph,
+        current: usize,
+        remaining: usize,
+        expect_matched: bool,
+        seen: &mut [bool],
+        path: &mut Vec<usize>,
+    ) -> bool {
+        if remaining == 0 {
+            return self.mate[current].is_none();
+        }
+        for &edge_index in graph.adj_edges(current) {
+            let edge = &graph.edges[edge_index];
+            let next = if edge.u == current { edge.v } else { edge.u };
+            if seen[next] || (self.mate[current] == Some(next)) != expect_matched {
+                continue;
+            }
+            seen[next] = true;
+            path.push(next);
+            if self.find_exact_augmenting_path(
+                graph,
+                next,
+                remaining - 1,
+                !expect_matched,
+                seen,
+                path,
+            ) {
+                return true;
+            }
+            path.pop();
+            seen[next] = false;
+        }
+        false
     }
 
     /// Reconstructs the complete unrolled alternating path connecting two exposed roots
     /// across the augmenting bridge edge.
     ///
     /// ## Parity Alignment
-    /// An augmenting bridge $e = (u, v)$ is an UNMATCHED edge connecting two even states in the
-    /// alternating forest. Therefore:
-    /// - From $u$, the path to its exposed root must start with a MATCHED edge (if $u$ is matched)
-    ///   or $u$ itself is an exposed root. Hence `need_even == true`.
-    /// - From $v$, the path to its exposed root symmetrically starts with a MATCHED edge (or $v$ is root).
-    /// - Splicing `path_u` (root_u -> ... -> u), bridge $(u, v)$, and `path_v.rev()` (v -> ... -> root_v)
-    ///   produces an alternating path of odd length (even number of vertices) starting and ending
-    ///   with an unmatched edge at distinct exposed roots.
+    /// An *unmatched* bridge joins two even alternating states, so backward
+    /// traversal on either side begins with a matched edge. A *matched*
+    /// bridge joins two odd states, so backward traversal begins with an
+    /// unmatched edge. Either way, the two halves must lead to distinct free
+    /// roots, and the spliced path is subsequently checked edge by edge.
     fn reconstruct_augmenting_path(
         &self,
         graph: &Graph,
@@ -970,7 +1300,11 @@ impl MicaliVazirani {
         visited_u[u] = true;
         visited_u[v] = true;
 
-        let path_u = self.find_path_to_root(graph, u, true, &mut visited_u)?;
+        // An unmatched bridge joins two EVEN paths; a matched bridge joins two
+        // ODD paths. Backward reconstruction must begin with the corresponding
+        // edge parity or it will reuse the bridge as an ordinary matched step.
+        let bridge_is_matched = self.mate[u] == Some(v);
+        let path_u = self.find_path_to_root(graph, u, !bridge_is_matched, &mut visited_u)?;
 
         // Ensure path_v is vertex-disjoint from path_u
         let mut visited_v = vec![false; self.vertex_count];
@@ -979,7 +1313,7 @@ impl MicaliVazirani {
         }
         visited_v[v] = true;
 
-        let path_v = self.find_path_to_root(graph, v, true, &mut visited_v)?;
+        let path_v = self.find_path_to_root(graph, v, !bridge_is_matched, &mut visited_v)?;
 
         let root_u = path_u.first()?;
         let root_v = path_v.first()?;
@@ -994,6 +1328,194 @@ impl MicaliVazirani {
         }
 
         Some(full_path)
+    }
+
+    /// Accept an augmentation only if it has a concrete certificate: a simple
+    /// path of the current phase's shortest length, with exposed endpoints,
+    /// the requested bridge, and correctly alternating matched status.
+    ///
+    /// The existing prop/petal reconstruction is tried first. If it chooses
+    /// two paths that meet at a base even though another predecessor choice
+    /// would reach distinct roots, the second search enumerates those choices.
+    /// That second search is a correctness-first measure, not a claim of MV's
+    /// O(E) phase bound; replacing it with certified linear-time DDFS remains
+    /// separate algorithmic work.
+    fn certified_augmenting_path(
+        &self,
+        graph: &Graph,
+        bridge_index: usize,
+        tenacity: usize,
+        forbidden: &[bool],
+    ) -> Option<Vec<usize>> {
+        if let Some(path) = self.reconstruct_augmenting_path(graph, bridge_index) {
+            if self.valid_augmenting_path(graph, bridge_index, tenacity, forbidden, &path) {
+                return Some(path);
+            }
+        }
+
+        let bridge = graph.edges.get(bridge_index)?;
+        let (u, v) = (bridge.u, bridge.v);
+        let bridge_matched = self.mate[u] == Some(v);
+        let (u_length, v_length) = if bridge_matched {
+            (self.odd_level[u]?, self.odd_level[v]?)
+        } else {
+            (self.even_level[u]?, self.even_level[v]?)
+        };
+        if u_length.checked_add(v_length)?.checked_add(1)? != tenacity
+            || tenacity >= graph.n
+            || forbidden.get(u).copied().unwrap_or(true)
+            || forbidden.get(v).copied().unwrap_or(true)
+        {
+            return None;
+        }
+
+        let mut seen_u = forbidden.to_vec();
+        seen_u[u] = true;
+        seen_u[v] = true;
+        let mut backward_u = vec![u];
+        let mut answer = None;
+        self.enumerate_half_paths(
+            graph,
+            u,
+            u_length,
+            !bridge_matched,
+            &mut seen_u,
+            &mut backward_u,
+            &mut |half_u| {
+                let mut seen_v = forbidden.to_vec();
+                for &vertex in half_u {
+                    seen_v[vertex] = true;
+                }
+                seen_v[v] = true;
+                let mut backward_v = vec![v];
+                self.enumerate_half_paths(
+                    graph,
+                    v,
+                    v_length,
+                    !bridge_matched,
+                    &mut seen_v,
+                    &mut backward_v,
+                    &mut |half_v| {
+                        let mut path: Vec<usize> = half_u.iter().rev().copied().collect();
+                        path.extend_from_slice(half_v);
+                        if self.valid_augmenting_path(
+                            graph,
+                            bridge_index,
+                            tenacity,
+                            forbidden,
+                            &path,
+                        ) {
+                            answer = Some(path);
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            },
+        );
+        answer
+    }
+
+    /// Enumerate simple alternating half-paths backwards from one bridge end.
+    /// `remaining` counts edges to an exposed root; `expect_matched` specifies
+    /// the status of the next edge while walking backwards.
+    fn enumerate_half_paths<F: FnMut(&[usize]) -> bool>(
+        &self,
+        graph: &Graph,
+        current: usize,
+        remaining: usize,
+        expect_matched: bool,
+        seen: &mut [bool],
+        backward: &mut Vec<usize>,
+        on_root: &mut F,
+    ) -> bool {
+        if remaining == 0 {
+            return self.mate[current].is_none() && on_root(backward);
+        }
+        for &edge_index in graph.adj_edges(current) {
+            let edge = &graph.edges[edge_index];
+            let next = if edge.u == current { edge.v } else { edge.u };
+            if next == current || seen[next] || (self.mate[current] == Some(next)) != expect_matched
+            {
+                continue;
+            }
+            seen[next] = true;
+            backward.push(next);
+            if self.enumerate_half_paths(
+                graph,
+                next,
+                remaining - 1,
+                !expect_matched,
+                seen,
+                backward,
+                on_root,
+            ) {
+                return true;
+            }
+            backward.pop();
+            seen[next] = false;
+        }
+        false
+    }
+
+    fn valid_augmenting_path(
+        &self,
+        graph: &Graph,
+        bridge_index: usize,
+        tenacity: usize,
+        forbidden: &[bool],
+        path: &[usize],
+    ) -> bool {
+        if tenacity >= graph.n || path.len() != tenacity + 1 || path.len() < 2 || tenacity % 2 == 0
+        {
+            return false;
+        }
+        let mut seen = vec![false; graph.n];
+        for &vertex in path {
+            if vertex >= graph.n || forbidden[vertex] || seen[vertex] {
+                return false;
+            }
+            seen[vertex] = true;
+        }
+        if self.mate[path[0]].is_some() || self.mate[*path.last().unwrap()].is_some() {
+            return false;
+        }
+        let bridge = &graph.edges[bridge_index];
+        let mut includes_bridge = false;
+        for (index, pair) in path.windows(2).enumerate() {
+            let (u, v) = (pair[0], pair[1]);
+            if graph.edge_index(u, v).is_none() || (self.mate[u] == Some(v)) != (index % 2 == 1) {
+                return false;
+            }
+            if (u == bridge.u && v == bridge.v) || (u == bridge.v && v == bridge.u) {
+                includes_bridge = true;
+            }
+        }
+        includes_bridge
+    }
+
+    fn path_halves_around_bridge(
+        &self,
+        path: &[usize],
+        u: usize,
+        v: usize,
+    ) -> (Vec<usize>, Vec<usize>) {
+        let split = path
+            .windows(2)
+            .position(|pair| (pair[0] == u && pair[1] == v) || (pair[0] == v && pair[1] == u))
+            .expect("certified augmenting path contains its bridge");
+        if path[split] == u {
+            (
+                path[..=split].iter().rev().copied().collect(),
+                path[split + 1..].to_vec(),
+            )
+        } else {
+            (
+                path[split + 1..].to_vec(),
+                path[..=split].iter().rev().copied().collect(),
+            )
+        }
     }
 
     /// Returns the alternating walk along the petal cycle from `curr` to `petal.base`.
@@ -1322,4 +1844,32 @@ fn edge_signature(graph: &Graph) -> Vec<(usize, usize)> {
         .iter()
         .map(|edge| (edge.u.min(edge.v), edge.u.max(edge.v)))
         .collect()
+}
+
+#[cfg(test)]
+mod certificate_tests {
+    use super::*;
+    use crate::graph::Edge;
+
+    #[test]
+    fn independent_shortest_path_check_rejects_a_longer_candidate() {
+        // Two free roots have both a direct edge and a length-five alternating
+        // route. The latter is valid, but must not be flipped in a shortest-
+        // augmenting-path phase while the direct edge remains available.
+        let graph = Graph::from_edges(
+            6,
+            [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (0, 5)]
+                .into_iter()
+                .map(|(u, v)| Edge::new(u, v, None))
+                .collect(),
+        );
+        let solver = MicaliVazirani::with_matching(
+            &graph,
+            vec![None, Some(2), Some(1), Some(4), Some(3), None],
+        )
+        .unwrap();
+        assert_eq!(solver.shortest_augmenting_path(&graph, 5), Some(vec![0, 5]));
+        assert!(solver.valid_augmenting_path(&graph, 2, 5, &[false; 6], &[0, 1, 2, 3, 4, 5],));
+        assert!(!solver.valid_augmenting_path(&graph, 2, 5, &[false; 6], &[0, 1, 2, 1, 4, 5],));
+    }
 }
