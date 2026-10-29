@@ -279,6 +279,8 @@ pub struct MicaliVazirani {
     petals: Vec<Petal>,
     /// Maps each vertex to the petal that assigned its MAX level (if any).
     petal_by_vertex: Vec<Option<usize>>,
+    /// Maps each vertex to all petals containing it.
+    petals_by_vertex: Vec<Vec<usize>>,
     /// Level queues for interleaved BFS traversal.
     level_queues: Vec<VecDeque<usize>>,
     /// Vertices committed to augmenting paths in the current phase.
@@ -315,6 +317,7 @@ impl MicaliVazirani {
             bottleneck_tenacity: None,
             petals: Vec::new(),
             petal_by_vertex: vec![None; n],
+            petals_by_vertex: vec![Vec::new(); n],
             level_queues: vec![VecDeque::new(); 2 * n + 4],
             committed_in_aug: vec![false; n],
             ddfs_pred_ptr: vec![0; n],
@@ -657,25 +660,36 @@ impl MicaliVazirani {
 
                         // Assign MAX levels and dynamically enqueue activated vertices
                         for &w in &cycle_vertices {
-                            if self.max_level[w].is_none() {
-                                if let Some(min_lvl) = self.min_level[w] {
-                                    if tenacity >= min_lvl {
-                                        let new_max = tenacity - min_lvl;
+                            if let Some(min_lvl) = self.min_level[w] {
+                                if tenacity >= min_lvl {
+                                    let new_max = tenacity - min_lvl;
+                                    let is_higher =
+                                        self.max_level[w].is_none_or(|old| new_max > old);
+                                    if is_higher {
                                         self.max_level[w] = Some(new_max);
-                                        self.petal_by_vertex[w] = Some(petal_id);
+                                    }
+                                    self.petal_by_vertex[w] = Some(petal_id);
+                                    if !self.petals_by_vertex[w].contains(&petal_id) {
+                                        self.petals_by_vertex[w].push(petal_id);
+                                    }
 
-                                        if new_max % 2 == 0 {
+                                    let mut enqueued = false;
+                                    if new_max % 2 == 0 {
+                                        if self.even_level[w].is_none_or(|old| new_max < old) {
                                             self.even_level[w] = Some(new_max);
-                                        } else {
-                                            self.odd_level[w] = Some(new_max);
+                                            enqueued = true;
                                         }
+                                    } else if self.odd_level[w].is_none_or(|old| new_max < old) {
+                                        self.odd_level[w] = Some(new_max);
+                                        enqueued = true;
+                                    }
 
-                                        // Dynamic propagation through blossom
-                                        if new_max > current_level
-                                            && new_max < self.level_queues.len()
-                                        {
-                                            self.level_queues[new_max].push_back(w);
-                                        }
+                                    // Dynamic propagation through blossom
+                                    if enqueued
+                                        && new_max > current_level
+                                        && new_max < self.level_queues.len()
+                                    {
+                                        self.level_queues[new_max].push_back(w);
                                     }
                                 }
                             }
@@ -773,8 +787,30 @@ impl MicaliVazirani {
             }
 
             match self.ddfs(graph, edge_idx, tenacity) {
-                DdfsResult::Petal { cycle_vertices, .. } => {
-                    self.assign_petal_max_levels(&cycle_vertices, tenacity)
+                DdfsResult::Petal {
+                    base,
+                    cycle_vertices,
+                    path_u,
+                    path_v,
+                } => {
+                    let petal_id = self.petals.len();
+                    let petal = Petal {
+                        id: petal_id,
+                        base,
+                        bridge_index: edge_idx,
+                        tenacity,
+                        cycle_vertices: cycle_vertices.clone(),
+                        path_u,
+                        path_v,
+                    };
+                    self.petals.push(petal);
+                    for &w in &cycle_vertices {
+                        self.petal_by_vertex[w] = Some(petal_id);
+                        if !self.petals_by_vertex[w].contains(&petal_id) {
+                            self.petals_by_vertex[w].push(petal_id);
+                        }
+                    }
+                    self.assign_petal_max_levels(&cycle_vertices, tenacity);
                 }
                 DdfsResult::AugmentingPath { bridge_edge, .. } => {
                     if self.bottleneck_tenacity.is_none() {
@@ -874,16 +910,16 @@ impl MicaliVazirani {
                                     cycle_vertices.push(w);
                                 }
                             }
-                            if let Some(cycle_vertices) = self.certified_petal_cycle(
+                            if let Some((actual_base, cycle_vertices)) = self.certified_petal_cycle(
                                 graph,
                                 bridge_index,
                                 tenacity,
                                 base_pred,
                                 cycle_vertices,
                             ) {
-                                self.union_petal(base_pred, &cycle_vertices);
+                                self.union_petal(actual_base, &cycle_vertices);
                                 return DdfsResult::Petal {
-                                    base: base_pred,
+                                    base: actual_base,
                                     cycle_vertices,
                                     path_u,
                                     path_v,
@@ -921,16 +957,16 @@ impl MicaliVazirani {
                                     cycle_vertices.push(w);
                                 }
                             }
-                            if let Some(cycle_vertices) = self.certified_petal_cycle(
+                            if let Some((actual_base, cycle_vertices)) = self.certified_petal_cycle(
                                 graph,
                                 bridge_index,
                                 tenacity,
                                 base_pred,
                                 cycle_vertices,
                             ) {
-                                self.union_petal(base_pred, &cycle_vertices);
+                                self.union_petal(actual_base, &cycle_vertices);
                                 return DdfsResult::Petal {
-                                    base: base_pred,
+                                    base: actual_base,
                                     cycle_vertices,
                                     path_u,
                                     path_v,
@@ -954,6 +990,21 @@ impl MicaliVazirani {
             // an augmenting-path certificate. The certified search above
             // already tried every compatible branch through this bridge.
             if !u_active && !v_active {
+                if let Some((actual_base, cycle_vertices)) = self.certified_petal_cycle(
+                    graph,
+                    bridge_index,
+                    tenacity,
+                    curr_u,
+                    Vec::new(),
+                ) {
+                    self.union_petal(actual_base, &cycle_vertices);
+                    return DdfsResult::Petal {
+                        base: actual_base,
+                        cycle_vertices,
+                        path_u,
+                        path_v,
+                    };
+                }
                 return DdfsResult::Redundant;
             }
         }
@@ -1019,21 +1070,72 @@ impl MicaliVazirani {
         graph: &Graph,
         bridge_index: usize,
         tenacity: usize,
-        base: usize,
+        suggested_base: usize,
         representative_cycle: Vec<usize>,
-    ) -> Option<Vec<usize>> {
-        let base_distance = self.min_level[base]?;
-        if base_distance % 2 != 0 {
-            return None;
+    ) -> Option<(usize, Vec<usize>)> {
+        // 1. Try suggested_base first
+        if let Some(cycle) = self.try_certified_petal_cycle_with_base(
+            graph,
+            bridge_index,
+            tenacity,
+            suggested_base,
+            &representative_cycle,
+        ) {
+            return Some((suggested_base, cycle));
         }
+
+        // 2. Try candidate bases from representative_cycle
+        for &cand in &representative_cycle {
+            if cand != suggested_base {
+                if let Some(cycle) = self.try_certified_petal_cycle_with_base(
+                    graph,
+                    bridge_index,
+                    tenacity,
+                    cand,
+                    &[],
+                ) {
+                    return Some((cand, cycle));
+                }
+            }
+        }
+
+        // 3. Try any vertex that has an even level compatible with this tenacity
+        for cand in 0..self.vertex_count {
+            if cand != suggested_base && !representative_cycle.contains(&cand) {
+                if let Some(cycle) = self.try_certified_petal_cycle_with_base(
+                    graph,
+                    bridge_index,
+                    tenacity,
+                    cand,
+                    &[],
+                ) {
+                    return Some((cand, cycle));
+                }
+            }
+        }
+
+        None
+    }
+
+    fn try_certified_petal_cycle_with_base(
+        &self,
+        graph: &Graph,
+        bridge_index: usize,
+        tenacity: usize,
+        base: usize,
+        representative_cycle: &[usize],
+    ) -> Option<Vec<usize>> {
+        let base_distance = self
+            .even_level[base]
+            .or_else(|| self.min_level[base].filter(|&l| l % 2 == 0))?;
         let cycle_len = tenacity.checked_sub(base_distance.checked_mul(2)?)?;
         if cycle_len < 3 || cycle_len % 2 == 0 || cycle_len > graph.n {
             return None;
         }
         if representative_cycle.len() == cycle_len
-            && self.valid_petal_cycle(graph, bridge_index, base, &representative_cycle)
+            && self.valid_petal_cycle(graph, bridge_index, base, representative_cycle)
         {
-            return Some(representative_cycle);
+            return Some(representative_cycle.to_vec());
         }
         let mut seen = vec![false; graph.n];
         seen[base] = true;
@@ -1660,7 +1762,7 @@ impl MicaliVazirani {
             }
 
             // Option B: if curr is inside a petal, route around the odd cycle via the petal bridge
-            if let Some(petal_id) = self.petal_by_vertex[curr] {
+            for &petal_id in self.petals_by_vertex[curr].iter().rev() {
                 let petal = &self.petals[petal_id];
                 if let Some(cycle_walk) = self.unroll_petal_cycle_to_base(petal, curr, false) {
                     let can_use = cycle_walk
@@ -1735,6 +1837,7 @@ impl MicaliVazirani {
         self.bottleneck_tenacity = None;
         self.petals.clear();
         self.petal_by_vertex.fill(None);
+        self.petals_by_vertex.iter_mut().for_each(Vec::clear);
         for q in &mut self.level_queues {
             q.clear();
         }

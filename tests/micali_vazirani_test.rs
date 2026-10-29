@@ -482,6 +482,42 @@ fn mv_matches_fast_blossom_on_complete_and_odd_graphs() {
     assert_eq!(res_mv_c7.edges.len(), 3);
 }
 
+#[test]
+fn mv_agrees_with_fast_blossom_on_varied_graphs() {
+    use blossom_study::FastBlossomMatching;
+
+    // Deterministic pseudo-random LCG for reproducible graphs
+    let mut rng_state = 123456789_u64;
+    let mut next_rand = || {
+        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        (rng_state >> 33) as u32
+    };
+
+    for n in [8, 10, 12, 14] {
+        for seed in 0..10 {
+            let mut edges = Vec::new();
+            for u in 0..n {
+                for v in (u + 1)..n {
+                    // Density ~ 35%
+                    if (next_rand() % 100) < 35 {
+                        edges.push(Edge::new(u, v, None));
+                    }
+                }
+            }
+            let graph = Graph::from_edges(n, edges);
+            let expected_cardinality = FastBlossomMatching::max_cardinality_matching(&graph).edges.len();
+
+            let mut mv = MicaliVazirani::new(&graph);
+            let mv_result = mv.max_cardinality_matching(&graph).unwrap();
+            assert_eq!(
+                mv_result.edges.len(),
+                expected_cardinality,
+                "Failed on n={n}, seed={seed}"
+            );
+        }
+    }
+}
+
 /// The greedy first phase may choose 1--3. The next phase must recognize the
 /// matched middle edge as a bridge of tenacity three and augment on
 /// 0--3==1--2, obtaining the perfect matching {0--3, 1--2}.
@@ -563,11 +599,10 @@ fn nested_petals_are_unrolled_to_an_actual_augmenting_path() {
     assert!(result.is_perfect);
 }
 
-/// This deeper case still exceeds the current DDFS/petal search. Keep it as a
-/// permanent fail-closed regression: the solver must not return a false
-/// "maximum" while a length-nine augmenting path remains.
+/// A 10-vertex graph with nested blossoms requiring a length-nine augmenting path.
+/// The solver successfully resolves the petal hierarchy and finds the maximum matching.
 #[test]
-fn missed_nested_petal_reports_uncertified_optimality() {
+fn nested_petal_length_nine_augmenting_path_succeeds() {
     let pairs = [
         (0, 1),
         (0, 4),
@@ -601,10 +636,9 @@ fn missed_nested_petal_reports_uncertified_optimality() {
         Some(5),
     ];
     let mut solver = MicaliVazirani::with_matching(&graph, initial).unwrap();
-    assert!(matches!(
-        solver.max_cardinality_matching(&graph),
-        Err(MicaliVaziraniError::UncertifiedOptimality { path_length: 9 })
-    ));
+    let result = solver.max_cardinality_matching(&graph).unwrap();
+    assert_eq!(result.edges.len(), 5);
+    assert!(result.is_perfect);
 }
 
 /// Exact, deliberately exponential oracle for the tiny exhaustive suite.
