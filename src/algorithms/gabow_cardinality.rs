@@ -1,16 +1,16 @@
-//! Gabow's Cardinality Matching Algorithm in General Graphs.
+//! Experimental Gabow-inspired phased cardinality matching in general graphs.
 //!
-//! Implementation of Harold N. Gabow's $O(m \sqrt{n})$ maximum cardinality matching algorithm,
-//! based on the formulation and LEDA implementation by Matin Ansaripour, Alireza Danaei,
-//! and Kurt Mehlhorn (September 2024, arXiv:2409.14849v1), adopting the weighted-matching
-//! reduction to cardinality matching (Gabow 2017, arXiv:1703.03998).
+//! Inspired by the phased approach described by Ansaripour, Danaei, and Mehlhorn
+//! (2024, arXiv:2409.14849). This is **not yet** their implementation: it does
+//! not construct the tight-edge auxiliary graph H or maintain Edmonds duals.
+//! Its Edmonds-style single-path search is a correctness aid, not a proof of
+//! the paper's $O(m\sqrt{n})$ bound.
 //!
 //! # Algorithmic Architecture
 //!
-//! The algorithm solves maximum cardinality matching in general graphs in $O(m \sqrt{n})$ time
-//! by organizing the search into discrete phases (iterations). Each iteration consists of two phases:
+//! The current search organizes work into iterations with two phases:
 //!
-//! 1. **Phase 1: Search and Auxiliary Graph $H$ Construction**:
+//! 1. **Phase 1: Alternating search**:
 //!    - Starts an alternating search from all currently exposed (unmatched) roots.
 //!    - Grows alternating trees level by level, classifying nodes as *outer* (even distance)
 //!      or *inner* (odd distance).
@@ -18,13 +18,11 @@
 //!      The cycle is contracted into its Lowest Common Ancestor (LCA) base in the DSU.
 //!    - When an edge connects two outer vertices in different trees, an augmenting path is found.
 //!    - Finds the bottleneck length $L$ of the shortest augmenting paths.
-//!    - Constructs an **auxiliary graph $H$** consisting of tight edges participating in shortest
-//!      augmenting paths of length $L$, with contracted blossom super-vertices.
-//!    - If $H$ is empty, no augmenting paths exist and the matching is certified maximum.
+//!    - Records candidate bridges. It does not yet construct the paper's graph H.
 //!
-//! 2. **Phase 2: Maximal Disjoint Augmentation**:
-//!    - Finds a maximal collection of vertex-disjoint shortest augmenting paths in $H$.
-//!    - Lifts/unrolls each path through contracted blossoms back into simple alternating paths in $G$.
+//! 2. **Phase 2: Candidate-path augmentation**:
+//!    - Attempts disjoint paths through the candidate bridges in G.
+//!    - Uses a separate single-path blossom search when the phased search stalls.
 //!    - Augments the matching along these paths, strictly increasing the matching size.
 //!    - Vertices committed to an augmentation are eliminated from further augmenting in this phase.
 
@@ -76,7 +74,7 @@ impl Dsu {
     }
 }
 
-/// Solver implementing the Ansaripour–Danaei–Mehlhorn variation of Gabow's cardinality algorithm.
+/// Experimental phased cardinality solver inspired by Gabow's algorithm.
 #[derive(Clone, Debug)]
 pub struct GabowCardinality {
     n: usize,
@@ -159,10 +157,18 @@ impl GabowCardinality {
         loop {
             self.iterations += 1;
 
-            // Phase 1: Search & Auxiliary Graph H Construction
+            // Phase 1: alternating search for candidate bridges (not graph H).
             let (shortest_len_opt, candidate_bridges) = self.phase1_search(graph);
             let Some(target_len) = shortest_len_opt else {
-                break; // No augmenting paths found -> maximum matching reached!
+                // The phased search is not a complete optimality certificate.
+                // In particular, nested blossoms can hide an augmenting path
+                // even when no candidate bridge was reported.
+                let single = self.augment_single_path(graph);
+                if single == 0 {
+                    break;
+                }
+                self.augmentations += single;
+                continue;
             };
 
             // Phase 2: Maximal Disjoint Augmentation

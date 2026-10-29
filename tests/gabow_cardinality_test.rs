@@ -111,6 +111,39 @@ fn gabow_solves_nested_petal_length_nine_graph() {
     assert!(result.is_perfect);
 }
 
+/// A missed bridge once made Phase 1 claim completion with exposed vertices
+/// 6 and 7. The path 6--2==5--3==1--4==0--7 augments to four pairs.
+#[test]
+fn gabow_does_not_stop_at_false_optimum_on_eight_vertices() {
+    let pairs = [
+        (0, 2),
+        (0, 4),
+        (0, 5),
+        (0, 6),
+        (0, 7),
+        (1, 3),
+        (1, 4),
+        (2, 5),
+        (2, 6),
+        (3, 4),
+        (3, 5),
+    ];
+    let graph = Graph::from_edges(
+        8,
+        pairs.iter().map(|&(u, v)| Edge::new(u, v, None)).collect(),
+    );
+    let mut solver = GabowCardinality::new(&graph);
+    let result = solver.max_cardinality_matching(&graph);
+    assert_eq!(result.edges.len(), 4);
+    assert!(result.is_perfect);
+    for (u, mate) in solver.mate().iter().enumerate() {
+        if let Some(v) = mate {
+            assert_eq!(solver.mate()[*v], Some(u));
+            assert!(graph.edge_index(u, *v).is_some());
+        }
+    }
+}
+
 #[test]
 fn gabow_matches_mv_and_fast_blossom_on_diverse_graphs() {
     let mut rng_state = 987654321_u64;
@@ -185,7 +218,7 @@ fn brute_maximum_cardinality(n: usize, edges: &[(usize, usize)], used: u64) -> u
 
 #[test]
 fn gabow_agrees_with_exhaustive_small_graph_oracle() {
-    for n in 0..=5 {
+    for n in 0..=6 {
         let possible_edges: Vec<_> = (0..n)
             .flat_map(|u| (u + 1..n).map(move |v| (u, v)))
             .collect();

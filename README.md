@@ -13,8 +13,8 @@ blossom-study/
 │   │   └── mod.rs          # Graph representations and generators
 │   └── algorithms/
 │       ├── mod.rs          # Common types and traits
-│       ├── gabow_cardinality.rs # Gabow's phased cardinality solver (Mehlhorn et al. 2024)
-│       ├── micali_vazirani.rs # Micali–Vazirani phased O(m√n) cardinality solver
+│       ├── gabow_cardinality.rs # Experimental Gabow-inspired cardinality solver
+│       ├── micali_vazirani.rs # Experimental phased Micali–Vazirani track
 │       ├── fast_blossom.rs # Conventional blossom cardinality baseline
 │       ├── hopcroft_karp.rs # Bipartite maximum-cardinality solver
 │       ├── hungarian.rs    # Bipartite assignment primal-dual solver
@@ -41,8 +41,8 @@ blossom-study/
 ## Current Status
 
 ### Working Features
-- ✅ **Gabow's Cardinality Matching** (`gabow`): $O(m \sqrt{n})$ phased cardinality matching based on Gabow (2017) and Mehlhorn et al. (Sept 2024, arXiv:2409.14849). Features Phase 1 auxiliary graph $H$ construction with blossom contraction and Phase 2 maximal disjoint shortest augmenting path extraction.
-- ✅ **Micali–Vazirani Phased Cardinality Matching** (`micali-vazirani`): $O(m \sqrt{n})$ general-graph cardinality solver featuring dynamic MIN/MAX parity levels, tenacity-ordered bridge queues, Double Depth-First Search (DDFS) petal detection, recursive blossom unrolling, and multi-phase augmentation.
+- 🧪 **Gabow-inspired cardinality** (`gabow`): phased alternating search with blossom contraction and an Edmonds-style single-path search when a phase stalls. It does **not** construct the paper's tight-edge auxiliary graph $H$ or establish its $O(m\sqrt n)$ bound. An eight-vertex false-optimum regression is retained.
+- 🧪 **Micali–Vazirani track** (`micali-vazirani`): parity levels, bridge tenacity, DDFS proposals, and petal unrolling. An independent exact validator rejects an unproved maximum; a second ten-vertex nested-petal case still returns `UncertifiedOptimality`. Its validation searches can be exponential, so the theoretical MV bound does **not** apply to this implementation.
 - ✅ **Conventional Blossom Cardinality** (`fast-blossom`): Edmonds blossom contraction with timestamp-based LCA and DSU.
 - ✅ **Hopcroft–Karp Bipartite Matching** (`hopcroft-karp`): $O(m \sqrt{n})$ multi-phase bipartite maximum cardinality matching.
 - ✅ **O(V³) Minimum-Weight Perfect Matching**:
@@ -53,32 +53,11 @@ blossom-study/
   - `sparse-blossom`: Sparse event-driven adjacency/map implementation.
 - ✅ **Hungarian Bipartite Assignment**: $O(k^3)$ primal-dual shortest augmenting paths with exact cost scaling.
 - ✅ **Graph Generators & Serialization**: Complete, sparse, grid, and planted matching generators with JSON serialization.
-- ✅ **Comprehensive Test Oracles**: All solvers validated against exhaustive brute-force oracles and cross-solver baselines.
+- ✅ **Small-graph test oracles**: cardinality solvers are checked exhaustively through six vertices; larger regressions remain important because that coverage does not prove general correctness.
 
-### Performance Summary (Debug Build)
+### Performance interpretation
 
-#### Maximum Cardinality Matching Comparison
-
-| Graph Family | Vertices | Edges | Algorithm | Match Size | Time (ms) | Phases |
-|--------------|----------|-------|-----------|------------|-----------|--------|
-| **Complete $K_{20}$** | 20 | 190 | `fast-blossom` | 10 | 0.05 | - |
-| | 20 | 190 | `gabow` | 10 | 0.07 | 2 |
-| | 20 | 190 | `mv` | 10 | 1.05 | 2 |
-| **Complete $K_{50}$** | 50 | 1,225 | `gabow` | 25 | 0.39 | 2 |
-| | 50 | 1,225 | `mv` | 25 | 15.63 | 2 |
-| **Complete $K_{100}$** | 100 | 4,950 | `gabow` | 50 | 1.63 | 2 |
-| | 100 | 4,950 | `mv` | 50 | 173.11 | 2 |
-| **Grid $10 \times 10$** | 100 | 180 | `gabow` | 50 | 0.22 | 2 |
-| | 100 | 180 | `mv` | 50 | 1.00 | 2 |
-| **Grid $20 \times 20$** | 400 | 760 | `gabow` | 200 | 0.62 | 2 |
-| | 400 | 760 | `mv` | 200 | 7.47 | 2 |
-| **Grid $30 \times 30$** | 900 | 1,740 | `gabow` | 450 | 1.18 | 2 |
-| | 900 | 1,740 | `mv` | 450 | 29.46 | 2 |
-| **Planted $n=100$** | 100 | 315 | `gabow` | 50 | 0.19 | 3 |
-| | 100 | 315 | `mv` | 50 | 1.79 | 2 |
-
-> [!NOTE]
-> **Asymptotic Bound vs. Practical Constant Factors**: While both Micali–Vazirani (1980) and Gabow (2017 / Mehlhorn et al. 2024) share the exact same theoretical worst-case time complexity of $O(m \sqrt{n})$, Gabow's algorithm runs **10x to 100x faster in practice**. Gabow's auxiliary graph $H$ and blossom contraction avoid the high constant-factor overhead of MV's dual MIN/MAX level bookkeeping, backtrack lists, and DDFS petal discovery.
+Use the benchmark commands below for measurements on your machine. The earlier debug-build table was removed because it predates Gabow's stall check and mixes MV's exact validator with the phased search. Neither timing constitutes a comparison with the published Gabow implementation or evidence for an asymptotic bound. Check matching correctness before comparing times.
 
 ---
 
@@ -93,7 +72,7 @@ cargo run -- generate -n 20 -o graph.json
 # Maximum cardinality matching using Fast Blossom (default)
 cargo run -- max-cardinality -i graph.json
 
-# Maximum cardinality matching using Gabow's algorithm (Mehlhorn et al. 2024)
+# Experimental Gabow-inspired cardinality track
 cargo run -- --algorithm gabow max-cardinality -i graph.json
 
 # Maximum cardinality matching using Micali-Vazirani
@@ -129,51 +108,26 @@ cargo bench --bench matching
 
 ## Algorithm Details
 
-### 1. Gabow's Cardinality Matching Algorithm (Mehlhorn et al., Sept 2024)
+### General-graph maximum-cardinality solvers
 
-Implemented in [`src/algorithms/gabow_cardinality.rs`](src/algorithms/gabow_cardinality.rs). Based on:
-> *Gabow's Cardinality Matching Algorithm in General Graphs: Implementation and Experiments*  
-> Matin Ansaripour, Alireza Danaei, and Kurt Mehlhorn (arXiv:2409.14849, Sept 24, 2024).
+- **`fast-blossom` — conventional Edmonds baseline.** Searches from exposed vertices, contracts odd cycles around a lowest common ancestor, and augments one path at a time. It is the simple general-graph comparator, not an MV or Gabow implementation. Literature: [Edmonds (1965)](https://doi.org/10.4153/CJM-1965-045-4); [Galil's survey (1986)](https://doi.org/10.1145/6462.6502).
+- **`micali-vazirani` — experimental MV track.** Alternating parity levels and tenacity-ordered bridges feed a DDFS/petal search; certified paths are unrolled and augmented in phases. An independent exact path search *validates* shortestness and termination but never supplies a matching. The second ten-vertex regression remains unresolved and returns `UncertifiedOptimality`. The exact validation prevents a claimed $O(m\sqrt n)$ implementation. Literature: [Micali–Vazirani (1980)](https://doi.org/10.1109/SFCS.1980.12); [Vazirani's proof](https://arxiv.org/abs/2012.03582).
+- **`gabow` — experimental Gabow-inspired track.** Uses a multi-root alternating search and DSU blossom contraction, then tries candidate augmenting bridges. When the phased search stalls, an Edmonds-style single-path search checks for a missed augmentation. This is **not** the algorithm of [Ansaripour, Danaei, and Mehlhorn (2024)](https://arxiv.org/abs/2409.14849): their phase one maintains dual/tight-edge information and builds an auxiliary graph $H$; phase two finds paths in $H$. No $O(m\sqrt n)$ bound is claimed for this Rust version.
 
-The algorithm runs in $O(\sqrt{n})$ phases, each taking $O(m)$ time, achieving an overall runtime of $O(m \sqrt{n})$:
+### Bipartite solvers
 
-- **Phase 1 (Search & Auxiliary Graph $H$)**:
-  - Performs a multi-source breadth-first search from all currently exposed (unmatched) vertices.
-  - Maintains outer (even distance) and inner (odd distance) labels.
-  - When an edge connects two outer vertices in the same alternating tree, an odd cycle (blossom) is detected. The blossom base (LCA) is identified, the blossom is contracted in the union-find structure, and parent links are updated around the cycle so path lifting remains direct.
-  - When an edge connects two outer vertices in different trees, an augmenting path is found. The shortest augmenting path length $L$ is established, and all augmenting bridges of length $L$ are collected.
-- **Phase 2 (Maximal Disjoint Path Extraction & Augmentation)**:
-  - Traverses the auxiliary graph $H$ to extract a maximal set of vertex-disjoint shortest augmenting paths of length $L$.
-  - Internal blossom cycles are unrolled via parent pointers (`p`, `orig_p`).
-  - Matched and unmatched edges along each path are flipped, strictly increasing the cardinality of the matching.
+- **`hopcroft-karp` — unweighted cardinality.** BFS layers free left-side vertices and DFS extracts a maximal set of shortest augmenting paths, giving the classical $O(m\sqrt n)$ bound. Literature: [Hopcroft–Karp (1973)](https://doi.org/10.1137/0202019).
+- **Hungarian — weighted assignment.** Maintains row/column dual labels and minimum reduced-cost slack while augmenting a square bipartite assignment. This is a bipartite comparator, not a general-graph MWPM solver. Literature: [Kuhn (1955)](https://doi.org/10.1002/nav.3800020109).
 
-### 2. Micali–Vazirani (MV) Cardinality Algorithm (1980)
+### General-graph minimum-weight perfect matching solvers
 
-Implemented in [`src/algorithms/micali_vazirani.rs`](src/algorithms/micali_vazirani.rs). Based on:
-> *An $O(\sqrt{|V|} \cdot |E|)$ Algorithm for Finding Maximum Matching in General Graphs*  
-> Silvio Micali and Vijay V. Vazirani (FOCS 1980).
+All five are in-repository primal-dual blossom studies, with distinct state representations. Their measured behavior should be compared on the same graph families; a common framework does not imply identical complexity or robustness.
 
-Key components:
-- **Dynamic Level Search**: Alternating BFS that assigns dual levels: $\min(v)$ (the length of the shortest alternating walk from an exposed vertex to $v$) and $\max(v)$ (the length of the shortest walk after blossom contraction).
-- **Tenacity Priority Queues**: Candidate edges (bridges) are bucketed by tenacity $2k + 1$ into an $O(1)$-access queue.
-- **Double Depth-First Search (DDFS)**: Searches backwards from bridge endpoints simultaneously at equal pace. If searches collide at a common ancestor, a petal/blossom is discovered without requiring physical contraction; if they reach distinct roots, an augmenting path is formed.
-- **Petal Unrolling**: Petals are recursively unpacked along precursor pointers to yield valid alternating paths.
-- **Maximal Disjoint Augmentation Engine**: Dequeues candidate paths at length $L$, lifts them through nested petals, and commits non-overlapping augmentations.
-
-### 3. Hopcroft–Karp (1973)
-
-Bipartite $O(m \sqrt{n})$ cardinality baseline. A multi-source BFS layers exposed left vertices, and a DFS extracts a maximal collection of vertex-disjoint shortest augmenting paths in each phase.
-
-### 4. Weighted Perfect Matching (MWPM) Solvers ($O(V^3)$)
-
-Five general-graph weighted implementations:
-| CLI solver | Representation | Status |
-| --- | --- | --- |
-| `primal-dual` | Edge-list Galil/Edmonds, exact `i128` duals | Established baseline |
-| `blossom-engine` | Explicit alternating forest and nested blossoms, exact `i128` duals | Independent verified implementation |
-| `blossom-tree` | Flat contraction history and hash-based containment | Adapted from MIT-licensed `mwmatching` |
-| `sparse-blossom` | Adjacency lists and incident-edge maps, exact `i128` duals | Experimental sparse-graph solver |
-| `cherry-tree` | Ordered cherry blossoms with recursive path lifting | Self-contained repaired implementation |
+- **`primal-dual` — weighted baseline.** Uses edge-list Edmonds/Galil alternating forests, integer-scaled costs and exact `i128` dual updates. Background: [Galil (1986)](https://doi.org/10.1145/6462.6502).
+- **`blossom-engine` — independent weighted state machine.** Makes blossom creation, dual adjustments and path lifting explicit for study; it solves the same weighted matching problem through a separate implementation. Background: [Edmonds (1965)](https://doi.org/10.1145/321250.321261); [Galil (1986)](https://doi.org/10.1145/6462.6502).
+- **`blossom-tree` — flat-containment variant.** Tracks nested contractions with a flat history and maps the final mate pairs back to input edges. Its code lineage is the MIT-licensed `mwmatching` adaptation, not Blossom V. Background: [Galil (1986)](https://doi.org/10.1145/6462.6502).
+- **`cherry-tree` — ordered blossom variant.** Represents nested odd cycles as cherries and recursively lifts paths through them. This is an educational representation of weighted primal-dual matching, not a claim to a distinct published complexity bound. Background: [Edmonds (1965)](https://doi.org/10.1145/321250.321261).
+- **`sparse-blossom` — event-driven sparse experiment.** Uses incident-edge maps rather than a dense weight matrix, while retaining weighted blossom/dual operations. Its amortized bound is not proved here. Background: [Kolmogorov's Blossom V paper (2009)](https://pub.ista.ac.at/~vnk/papers/blossom5.pdf) for a contrasting mature weighted implementation.
 
 ---
 

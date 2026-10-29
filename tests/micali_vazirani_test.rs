@@ -505,7 +505,9 @@ fn mv_agrees_with_fast_blossom_on_varied_graphs() {
                 }
             }
             let graph = Graph::from_edges(n, edges);
-            let expected_cardinality = FastBlossomMatching::max_cardinality_matching(&graph).edges.len();
+            let expected_cardinality = FastBlossomMatching::max_cardinality_matching(&graph)
+                .edges
+                .len();
 
             let mut mv = MicaliVazirani::new(&graph);
             let mv_result = mv.max_cardinality_matching(&graph).unwrap();
@@ -639,6 +641,38 @@ fn nested_petal_length_nine_augmenting_path_succeeds() {
     let result = solver.max_cardinality_matching(&graph).unwrap();
     assert_eq!(result.edges.len(), 5);
     assert!(result.is_perfect);
+}
+
+/// A different nested-petal arrangement still defeats bridge discovery. The
+/// exact verifier must expose the gap instead of returning a false maximum.
+#[test]
+fn mv_reports_uncertified_optimality_on_second_ten_vertex_regression() {
+    let pairs = [
+        (0, 1),
+        (0, 5),
+        (0, 7),
+        (1, 2),
+        (1, 8),
+        (2, 3),
+        (2, 6),
+        (2, 8),
+        (2, 9),
+        (4, 6),
+        (4, 9),
+        (5, 7),
+        (5, 9),
+        (6, 7),
+        (6, 9),
+    ];
+    let graph = Graph::from_edges(
+        10,
+        pairs.iter().map(|&(u, v)| Edge::new(u, v, None)).collect(),
+    );
+    let mut solver = MicaliVazirani::new(&graph);
+    assert!(matches!(
+        solver.max_cardinality_matching(&graph),
+        Err(MicaliVaziraniError::UncertifiedOptimality { path_length: 9 })
+    ));
 }
 
 /// Exact, deliberately exponential oracle for the tiny exhaustive suite.
