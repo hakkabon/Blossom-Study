@@ -1,7 +1,7 @@
 //! Benchmark runner for matching algorithms
 
 use blossom_study::{
-    algorithms::{FastBlossomMatching, MicaliVazirani},
+    algorithms::{FastBlossomMatching, GabowCardinality, MicaliVazirani},
     graph::{Edge, Graph, generator},
 };
 
@@ -40,7 +40,7 @@ fn main() {
     ];
 
     println!(
-        "{:<20} | {:>6} | {:>6} | {:>10} | {:>8} | {:>8} | {:>10}",
+        "{:<20} | {:>6} | {:>8} | {:>8} | {:>10} | {:>8} | {:>10}",
         "Graph", "Algo", "Vertices", "Edges", "Match Size", "Time(ms)", "Blossoms"
     );
     println!(
@@ -49,7 +49,10 @@ fn main() {
     );
 
     for (name, graph) in test_cases {
-        let result3 = FastBlossomMatching::max_cardinality_matching(&graph);
+        let result_fast = FastBlossomMatching::max_cardinality_matching(&graph);
+        let mut mv_solver = MicaliVazirani::new(&graph);
+        let result_mv = mv_solver.max_cardinality_matching(&graph).unwrap();
+        let result_gabow = GabowCardinality::compute_matching(&graph);
 
         println!(
             "{:<20} | {:>6} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>10}",
@@ -57,9 +60,29 @@ fn main() {
             "fast",
             graph.n,
             graph.edges.len(),
-            result3.edges.len(),
-            result3.metadata.runtime_ms,
-            result3.metadata.blossoms_created
+            result_fast.edges.len(),
+            result_fast.metadata.runtime_ms,
+            result_fast.metadata.blossoms_created
+        );
+        println!(
+            "{:<20} | {:>6} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>10}",
+            "",
+            "mv",
+            graph.n,
+            graph.edges.len(),
+            result_mv.edges.len(),
+            result_mv.metadata.runtime_ms,
+            result_mv.metadata.blossoms_created
+        );
+        println!(
+            "{:<20} | {:>6} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>10}",
+            "",
+            "gabow",
+            graph.n,
+            graph.edges.len(),
+            result_gabow.edges.len(),
+            result_gabow.metadata.runtime_ms,
+            result_gabow.metadata.blossoms_created
         );
 
         if graph.n % 2 == 0 {
@@ -105,42 +128,77 @@ fn main() {
         }
     }
 
-    println!("\nMICALI-VAZIRANI DEVELOPMENT PHASE");
-    println!("Only alternating level search is timed; this is not an end-to-end matcher.");
-    println!("-- Complete graphs (dense, O(n^2) edges) --");
+    println!("\nCARDINALITY MATCHING: MICALI-VAZIRANI VS GABOW (MEHLHORN ET AL. 2024)");
+    println!("Comparing end-to-end phased maximum cardinality algorithms with O(m*sqrt(n)) complexity.");
+    println!(
+        "{:<20} | {:>8} | {:>8} | {:>8} | {:>10} | {:>8} | {:>8}",
+        "Graph Family", "Vertices", "Edges", "Algo", "Match Size", "Time(ms)", "Phases"
+    );
+    println!(
+        "{:-<20}-|-{:-<8}-|-{:-<8}-|-{:-<8}-|-{:-<10}-|-{:-<8}-|-{:-<8}",
+        "", "", "", "", "", "", ""
+    );
+
+    // 1. Dense Complete Graphs
     for n in [20, 50, 100] {
         let graph = generator::complete_graph(n, (1.0, 100.0));
-        let started = std::time::Instant::now();
-        let mut solver = MicaliVazirani::new(&graph);
-        solver
-            .run_level_search_phase(&graph)
-            .expect("level search should accept its construction graph");
+        let mut mv_solver = MicaliVazirani::new(&graph);
+        let res_mv = mv_solver.max_cardinality_matching(&graph).unwrap();
+        let res_gabow = GabowCardinality::compute_matching(&graph);
+
         println!(
-            "  dense  n={n:>4}, edges={:>6}, scans={:>8}, time={:>8.3} ms",
+            "{:<20} | {:>8} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>8}",
+            format!("Complete K{n}"),
+            graph.n,
             graph.edges.len(),
-            solver.level_search_scans(),
-            started.elapsed().as_secs_f64() * 1000.0
+            "mv",
+            res_mv.edges.len(),
+            res_mv.metadata.runtime_ms,
+            res_mv.metadata.iterations
+        );
+        println!(
+            "{:<20} | {:>8} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>8}",
+            "",
+            "",
+            "",
+            "gabow",
+            res_gabow.edges.len(),
+            res_gabow.metadata.runtime_ms,
+            res_gabow.metadata.iterations
         );
     }
 
-    println!("-- Grid graphs (sparse planar, O(n) edges) --");
+    // 2. Grid Graphs
     for side in [10, 20, 30] {
         let n = side * side;
         let graph = generator::grid_graph(side, side, (1.0, 100.0));
-        let started = std::time::Instant::now();
-        let mut solver = MicaliVazirani::new(&graph);
-        solver
-            .run_level_search_phase(&graph)
-            .expect("level search should accept its construction graph");
+        let mut mv_solver = MicaliVazirani::new(&graph);
+        let res_mv = mv_solver.max_cardinality_matching(&graph).unwrap();
+        let res_gabow = GabowCardinality::compute_matching(&graph);
+
         println!(
-            "  grid   n={n:>4}, edges={:>6}, scans={:>8}, time={:>8.3} ms",
+            "{:<20} | {:>8} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>8}",
+            format!("Grid {side}x{side}"),
+            n,
             graph.edges.len(),
-            solver.level_search_scans(),
-            started.elapsed().as_secs_f64() * 1000.0
+            "mv",
+            res_mv.edges.len(),
+            res_mv.metadata.runtime_ms,
+            res_mv.metadata.iterations
+        );
+        println!(
+            "{:<20} | {:>8} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>8}",
+            "",
+            "",
+            "",
+            "gabow",
+            res_gabow.edges.len(),
+            res_gabow.metadata.runtime_ms,
+            res_gabow.metadata.iterations
         );
     }
 
-    println!("-- Planted 50% matching (multi-hop alternating exploration) --");
+    // 3. Planted Matching Graphs
     for n in [20, 50, 100] {
         let mut edges = Vec::new();
         let matched_pairs = (n / 4) * 2;
@@ -159,17 +217,29 @@ fn main() {
             }
         }
         let graph = Graph::from_edges(n, edges);
-        let started = std::time::Instant::now();
-        let mut solver = MicaliVazirani::with_matching(&graph, mate).unwrap();
-        solver
-            .run_level_search_phase(&graph)
-            .expect("level search should accept its construction graph");
+        let mut mv_solver = MicaliVazirani::new(&graph);
+        let res_mv = mv_solver.max_cardinality_matching(&graph).unwrap();
+        let res_gabow = GabowCardinality::compute_matching(&graph);
+
         println!(
-            "  planted n={n:>3}, edges={:>6}, scans={:>8}, bridges={:>3}, time={:>8.3} ms",
+            "{:<20} | {:>8} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>8}",
+            format!("Planted n={n}"),
+            graph.n,
             graph.edges.len(),
-            solver.level_search_scans(),
-            solver.bridge_candidates().len(),
-            started.elapsed().as_secs_f64() * 1000.0
+            "mv",
+            res_mv.edges.len(),
+            res_mv.metadata.runtime_ms,
+            res_mv.metadata.iterations
+        );
+        println!(
+            "{:<20} | {:>8} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:>8}",
+            "",
+            "",
+            "",
+            "gabow",
+            res_gabow.edges.len(),
+            res_gabow.metadata.runtime_ms,
+            res_gabow.metadata.iterations
         );
     }
 

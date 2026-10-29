@@ -9,8 +9,10 @@ use rustyline::DefaultEditor;
 pub enum Algorithm {
     /// Fast Blossom (DSU with timestamp LCA)
     FastBlossom,
-    /// Experimental phased Micali–Vazirani solver (may reject uncertified results)
+    /// Phased Micali–Vazirani solver (O(m sqrt(n)))
     MicaliVazirani,
+    /// Gabow's phased cardinality solver (Mehlhorn et al. 2024, O(m sqrt(n)))
+    Gabow,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -56,6 +58,9 @@ impl Algorithm {
             Algorithm::MicaliVazirani => algorithms::MicaliVazirani::new(graph)
                 .max_cardinality_matching(graph)
                 .map_err(|error| error.to_string()),
+            Algorithm::Gabow => Ok(
+                algorithms::gabow_maximum_cardinality_matching(graph),
+            ),
         }
     }
 }
