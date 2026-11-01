@@ -198,7 +198,7 @@ impl GabowCardinality {
     // PHASE 1: Search & Auxiliary Graph H Construction
     // =========================================================================
 
-    fn phase1_search(&mut self, graph: &Graph) -> (Option<usize>, Vec<(usize, usize, usize)>) {
+    pub fn phase1_search(&mut self, graph: &Graph) -> (Option<usize>, Vec<(usize, usize, usize)>) {
         self.dsu.reset();
         self.level.fill(usize::MAX);
         self.label.fill(-1);
@@ -368,7 +368,7 @@ impl GabowCardinality {
     // PHASE 2: Maximal Disjoint Augmentation
     // =========================================================================
 
-    fn phase2_augment(
+    pub fn phase2_augment(
         &mut self,
         graph: &Graph,
         target_len: usize,
@@ -430,27 +430,67 @@ impl GabowCardinality {
         augmentations
     }
 
-    /// Traces an alternating walk from outer vertex `start` to an exposed root.
+    /// Traces an alternating path from an outer (even-level) vertex `curr`
+    /// back to an exposed root, following the BFS alternating-tree structure.
+    ///
+    /// ## Alternating Path Pattern
+    ///
+    /// In Edmonds' BFS, the alternating tree alternates between **outer**
+    /// (even-level) and **inner** (odd-level) vertices:
+    ///
+    /// ```text
+    ///   root(outer) ──unmatched──> inner ──matched──> outer ──unmatched──> inner ──…
+    /// ```
+    ///
+    /// Tracing **backward** from an outer vertex toward the root means each
+    /// step takes:
+    ///   1. The **matched** edge from `outer` to its `inner` partner, then
+    ///   2. The **unmatched** edge from `inner` to its BFS parent (`p[inner]`).
+    ///
+    /// ## Why `p[curr]` Is Wrong for Outer Vertices
+    ///
+    /// During BFS, `p[v]` is set only for **inner** vertices — the outer
+    /// vertex that discovered them.  For outer vertices that are the *mate*
+    /// of an inner vertex, `p` is never set (it stays `usize::MAX`).  The
+    /// previous implementation used `p[curr]` for the outer vertex, which
+    /// returned `usize::MAX` and produced a single-element path `[curr]`.
+    /// This meant `phase2_augment` could only succeed for length-1 paths
+    /// (where the bridge endpoints are themselves the exposed roots).
+    ///
+    /// ## Blossom Handling
+    ///
+    /// `mark_blossom` overwrites `p[v]` for **outer** blossom vertices to
+    /// create a shortcut through the blossom.  This function avoids those
+    /// shortcuts because it uses `p[inner]` (the BFS parent of the inner
+    /// partner), which `mark_blossom` never modifies.  The path therefore
+    /// follows the original BFS tree through the blossom interior, producing
+    /// a correctly alternating path.
     fn trace_to_root(&self, mut curr: usize) -> Vec<usize> {
         let mut path = vec![curr];
-        while let Some(_m) = self.mate[curr] {
-            let prev = self.p[curr];
-            if prev == usize::MAX {
-                break;
+        loop {
+            // Step 1: from outer vertex, follow the MATCHED edge to inner partner.
+            // In an alternating path starting at an outer vertex, the edge
+            // toward the root is the matched edge.
+            let partner = match self.mate[curr] {
+                Some(p) => p,
+                None => break, // curr is an exposed root — path is complete
+            };
+            path.push(partner);
+
+            // Step 2: from inner vertex, follow p[partner] — the UNMATCHED
+            // edge that originally discovered `partner` during BFS.  This
+            // leads back to the next outer vertex toward the root.
+            let parent = self.p[partner];
+            if parent == usize::MAX {
+                break; // partner was discovered by a root directly
             }
-            path.push(prev);
-            if let Some(next_outer) = self.mate[prev] {
-                path.push(next_outer);
-                curr = next_outer;
-            } else {
-                break;
-            }
+            path.push(parent);
+            curr = parent;
         }
         path
     }
 
-    /// Fallback single-path augmentation using Edmonds' path search.
-    fn augment_single_path(&mut self, graph: &Graph) -> usize {
+    pub fn augment_single_path(&mut self, graph: &Graph) -> usize {
         self.dsu.reset();
         self.label.fill(-1);
         self.p.fill(usize::MAX);

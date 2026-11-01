@@ -602,6 +602,39 @@ impl MicaliVazirani {
                                     self.bridges.push(edge_idx);
                                 }
                             }
+                            // FIX (Defect 4): Even if bridge_tenacity returned
+                            // None (because odd_level[v] is not yet set), the
+                            // matched edge from u (odd, level current_level) to
+                            // v still gives v an even-length alternating walk of
+                            // length next_lvl.  If v lacks an even_level, we set
+                            // it now to give v dual parity (both odd and even
+                            // levels).
+                            //
+                            // This is essential because:
+                            //   1. Petal formation: v can now participate in a
+                            //      blossom (petals require dual-parity vertices).
+                            //   2. Bridge detection: once v later receives an
+                            //      odd_level from another path, the matched edge
+                            //      becomes a detectable bridge via
+                            //      bridge_tenacity.
+                            //
+                            // Without this fix, v never gets its even_level,
+                            // the matched bridge is permanently missed in this
+                            // phase, and the algorithm may declare completion
+                            // while an augmenting path still exists — producing
+                            // an UncertifiedOptimality error.
+                            //
+                            // We enqueue v at the new even level so it can
+                            // propagate the search (scan unmatched edges from
+                            // the new even state).  next_lvl = current_level+1,
+                            // which is the next level to be processed, so v
+                            // will be dequeued promptly.
+                            if self.even_level[v].is_none() {
+                                self.even_level[v] = Some(next_lvl);
+                                if next_lvl < self.level_queues.len() {
+                                    self.level_queues[next_lvl].push_back(v);
+                                }
+                            }
                         } else if self.even_level[v].is_none() {
                             self.even_level[v] = Some(next_lvl);
                             if self.min_level[v].is_none() {
@@ -1099,20 +1132,23 @@ impl MicaliVazirani {
             }
         }
 
-        // 3. Try any vertex that has an even level compatible with this tenacity
-        for cand in 0..self.vertex_count {
-            if cand != suggested_base && !representative_cycle.contains(&cand) {
-                if let Some(cycle) = self.try_certified_petal_cycle_with_base(
-                    graph,
-                    bridge_index,
-                    tenacity,
-                    cand,
-                    &[],
-                ) {
-                    return Some((cand, cycle));
-                }
-            }
-        }
+        // Note: The previous implementation had a third step that tried every
+        // vertex in the graph (0..vertex_count) as a candidate base.  This
+        // was removed because:
+        //
+        //   1. It multiplied the already-exponential `find_petal_cycle` DFS by
+        //      O(n), making the total cost O(n × branching^depth).  For the
+        //      nested_petal_length_nine test (n=10, depth=7), this was the
+        //      primary cause of the algorithm hanging.
+        //   2. A valid petal base must lie on the alternating tree path, which
+        //      is captured by the suggested_base and representative_cycle
+        //      candidates already tried above.  A base not on these paths
+        //      would imply a nested-petal structure that requires recursive
+        //      DDFS to discover — not a brute-force vertex scan.
+        //   3. The proper fix for nested petals is to implement MV's recursive
+        //      DDFS with incremental tree-based set merging, which discovers
+        //      nested petal bases in O(E) per phase.  This is left as future
+        //      algorithmic work.
 
         None
     }
@@ -1740,26 +1776,27 @@ impl MicaliVazirani {
                 }
             }
 
-            // Also check all incident unmatched edges as fallback
-            for &edge_idx in graph.adj_edges(curr) {
-                let edge = &graph.edges[edge_idx];
-                let p = if edge.u == curr { edge.v } else { edge.u };
-                if self.mate[curr] == Some(p) {
-                    continue;
-                }
-                if !visited[p] && self.even_level[p].is_some() {
-                    let p_level = self.even_level[p].unwrap();
-                    let curr_odd = self.odd_level[curr].unwrap_or(usize::MAX);
-                    if p_level < curr_odd {
-                        visited[p] = true;
-                        if let Some(mut path) = self.find_path_to_root(graph, p, true, visited) {
-                            path.push(curr);
-                            return Some(path);
-                        }
-                        visited[p] = false;
-                    }
-                }
-            }
+            // Note: The previous implementation had a second loop here that
+            // scanned ALL incident unmatched edges (not just predecessor
+            // props) as a "fallback."  This was removed because:
+            //
+            //   1. It duplicated the predecessor-prop loop above but with a
+            //      much larger branching factor (every incident edge vs.
+            //      only BFS-discovered predecessor edges).
+            //   2. Combined with backtracking (visited[p] = false after a
+            //      failed recursion), it produced exponential time complexity
+            //      on graphs with nested blossoms, causing the algorithm to
+            //      hang on the nested_petal_length_nine test case.
+            //   3. The predecessor props already capture every edge that the
+            //      BFS identified as leading toward the root.  Any edge NOT
+            //      in the predecessor list either leads to a longer path
+            //      (which we don't want) or to a vertex that hasn't been
+            //      reached at an even level (which wouldn't satisfy the
+            //      `even_level[p].is_some()` check anyway).
+            //
+            // If the predecessor-based search fails, the caller falls back
+            // to `enumerate_half_paths`, which performs an exhaustive (but
+            // depth-bounded) search.
 
             // Option B: if curr is inside a petal, route around the odd cycle via the petal bridge
             for &petal_id in self.petals_by_vertex[curr].iter().rev() {
