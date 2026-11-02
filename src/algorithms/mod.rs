@@ -65,7 +65,7 @@ pub mod blossom_tree;
 mod blossom_tree_flat;
 pub mod cherry_tree_solver;
 pub mod fast_blossom;
-pub mod gabow_cardinality;
+pub mod gabow_heuristic;
 pub mod hopcroft_karp;
 pub mod hungarian;
 mod korte_vygen;
@@ -78,7 +78,7 @@ pub use blossom_engine::{BlossomEngine, blossom_engine_minimum_weight_perfect_ma
 pub use blossom_tree::{BlossomTreeSolver, blossom_tree_minimum_weight_perfect_matching};
 pub use cherry_tree_solver::{CherryTreeSolver, cherry_tree_minimum_weight_perfect_matching};
 pub use fast_blossom::FastBlossomMatching;
-pub use gabow_cardinality::{GabowCardinality, gabow_maximum_cardinality_matching};
+pub use gabow_heuristic::{GabowHeuristic, gabow_heuristic_matching};
 pub use hopcroft_karp::{HopcroftKarpSolver, hopcroft_karp_maximum_cardinality_matching};
 pub use hungarian::{HungarianSolver, hungarian_minimum_weight_perfect_matching};
 pub use micali_vazirani::{

@@ -11,7 +11,7 @@ pub enum Algorithm {
     FastBlossom,
     /// Experimental Micali–Vazirani track (may reject uncertified results)
     MicaliVazirani,
-    /// Experimental Gabow-inspired phased cardinality solver
+    /// Gabow-inspired heuristic phased cardinality solver (correct but no O(m√n) guarantee)
     Gabow,
 }
 
@@ -58,7 +58,7 @@ impl Algorithm {
             Algorithm::MicaliVazirani => algorithms::MicaliVazirani::new(graph)
                 .max_cardinality_matching(graph)
                 .map_err(|error| error.to_string()),
-            Algorithm::Gabow => Ok(algorithms::gabow_maximum_cardinality_matching(graph)),
+            Algorithm::Gabow => Ok(algorithms::gabow_heuristic_matching(graph)),
         }
     }
 }
