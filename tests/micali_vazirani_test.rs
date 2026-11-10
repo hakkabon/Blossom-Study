@@ -643,10 +643,10 @@ fn nested_petal_length_nine_augmenting_path_succeeds() {
     assert!(result.is_perfect);
 }
 
-/// A different nested-petal arrangement still defeats bridge discovery. The
-/// exact verifier must expose the gap instead of returning a false maximum.
+/// Regression graph for nested-petal discovery. The current implementation
+/// resolves this instance and returns a perfect matching.
 #[test]
-fn mv_reports_uncertified_optimality_on_second_ten_vertex_regression() {
+fn mv_solves_second_ten_vertex_nested_petal_regression() {
     let pairs = [
         (0, 1),
         (0, 5),
@@ -669,10 +669,11 @@ fn mv_reports_uncertified_optimality_on_second_ten_vertex_regression() {
         pairs.iter().map(|&(u, v)| Edge::new(u, v, None)).collect(),
     );
     let mut solver = MicaliVazirani::new(&graph);
-    assert!(matches!(
-        solver.max_cardinality_matching(&graph),
-        Err(MicaliVaziraniError::UncertifiedOptimality { path_length: 9 })
-    ));
+    let result = solver.max_cardinality_matching(&graph);
+    let result = result.expect("nested-petal regression should be solved");
+    assert_eq!(result.edges.len(), 5);
+    assert!(result.is_perfect);
+    result.validate(&graph).unwrap();
 }
 
 /// Exact, deliberately exponential oracle for the tiny exhaustive suite.

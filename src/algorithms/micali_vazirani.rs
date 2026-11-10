@@ -44,13 +44,18 @@
 //! 7. **Termination (Berge's Lemma)**:
 //!    The phase's failure to find a bridge is not yet a proof of optimality here: nested-petal
 //!    discovery is incomplete. An independent exact alternating-path search checks the claim
-//!    and returns an error if the phased search missed a path. It is exponential in general.
+//!    and returns an error if the phased search missed a path. Recursive certificate searches
+//!    share a fixed work budget and return an error when it is exhausted; no MV complexity bound
+//!    is claimed for this correctness-first experiment.
 
 use crate::algorithms::{MatchingMetadata, MatchingResult};
 use crate::graph::Graph;
+use std::cell::Cell;
 use std::collections::VecDeque;
 use std::fmt;
 use std::time::Instant;
+
+const EXPERIMENTAL_SEARCH_NODE_BUDGET: usize = 100_000;
 
 /// Execution phase of the Micali–Vazirani state machine.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -84,6 +89,10 @@ pub enum MicaliVaziraniError {
     MissingAugmentation {
         tenacity: usize,
     },
+    /// A correctness-first recursive search reached its fixed work limit.
+    SearchBudgetExceeded {
+        limit: usize,
+    },
 }
 
 impl fmt::Display for MicaliVaziraniError {
@@ -108,6 +117,10 @@ impl fmt::Display for MicaliVaziraniError {
             Self::MissingAugmentation { tenacity } => write!(
                 formatter,
                 "no certified augmentation for claimed bottleneck tenacity {tenacity}"
+            ),
+            Self::SearchBudgetExceeded { limit } => write!(
+                formatter,
+                "experimental Micali–Vazirani search exceeded its {limit}-state safety budget; no result was certified"
             ),
         }
     }
@@ -244,6 +257,8 @@ pub enum DdfsResult {
         left_path: Vec<usize>,
         right_path: Vec<usize>,
     },
+    /// Recursive certificate search exhausted its safety budget.
+    SearchBudgetExceeded,
     /// Redundant bridge whose endpoints already share the same petal base.
     Redundant,
 }
@@ -292,6 +307,8 @@ pub struct MicaliVazirani {
     iterations: usize,
     total_augmentations: usize,
     total_blossoms_created: usize,
+    /// Bounds the experimental recursive certificate and reconstruction searches.
+    search_nodes_remaining: Cell<usize>,
 }
 
 impl MicaliVazirani {
@@ -324,6 +341,7 @@ impl MicaliVazirani {
             iterations: 0,
             total_augmentations: 0,
             total_blossoms_created: 0,
+            search_nodes_remaining: Cell::new(EXPERIMENTAL_SEARCH_NODE_BUDGET),
         }
     }
 
@@ -451,8 +469,9 @@ impl MicaliVazirani {
     /// Attempts a maximum-cardinality matching using the experimental MV phases.
     ///
     /// An independent, exact path oracle checks shortestness before every flip and
-    /// optimality at termination. A failed check returns an error rather than a
-    /// silently nonmaximum result. This intentionally postpones the time bound.
+    /// optimality at termination, within a fixed recursive-search budget. A failed
+    /// check returns an error rather than a silently nonmaximum result. This
+    /// intentionally postpones the time bound.
     pub fn max_cardinality_matching(
         &mut self,
         graph: &Graph,
@@ -462,6 +481,8 @@ impl MicaliVazirani {
         self.iterations = 0;
         self.total_augmentations = 0;
         self.total_blossoms_created = 0;
+        self.search_nodes_remaining
+            .set(EXPERIMENTAL_SEARCH_NODE_BUDGET);
 
         loop {
             self.iterations += 1;
@@ -469,12 +490,14 @@ impl MicaliVazirani {
 
             // Run the interleaved level search & bridge processing phase
             let bottleneck = self.run_interleaved_search_phase(graph)?;
+            self.ensure_search_budget()?;
 
             // The search can still miss a bridge inside nested petals. Check
             // Berge's condition independently before calling the result maximum.
             let Some(tenacity) = bottleneck else {
-                if let Some(path) = self.shortest_augmenting_path(graph, graph.n.saturating_sub(1))
-                {
+                let path = self.shortest_augmenting_path(graph, graph.n.saturating_sub(1));
+                self.ensure_search_budget()?;
+                if let Some(path) = path {
                     return Err(MicaliVaziraniError::UncertifiedOptimality {
                         path_length: path.len() - 1,
                     });
@@ -736,6 +759,11 @@ impl MicaliVazirani {
                             self.augmenting_bridges.push(bridge_edge);
                         }
                     }
+                    DdfsResult::SearchBudgetExceeded => {
+                        return Err(MicaliVaziraniError::SearchBudgetExceeded {
+                            limit: EXPERIMENTAL_SEARCH_NODE_BUDGET,
+                        });
+                    }
                     DdfsResult::Redundant => {}
                 }
             }
@@ -853,6 +881,11 @@ impl MicaliVazirani {
                         self.augmenting_bridges.push(bridge_edge);
                     }
                 }
+                DdfsResult::SearchBudgetExceeded => {
+                    return Err(MicaliVaziraniError::SearchBudgetExceeded {
+                        limit: EXPERIMENTAL_SEARCH_NODE_BUDGET,
+                    });
+                }
                 DdfsResult::Redundant => {}
             }
         }
@@ -867,11 +900,17 @@ impl MicaliVazirani {
 
     /// Double Depth-First Search in lockstep backwards along predecessor edges.
     ///
-    /// Guarantees O(cycle) work per petal by:
+    /// The predecessor-only core avoids rescanning edges by:
     /// - Alternating steps between Left and Right search frontiers;
     /// - Skipping already-contracted petals via `find_petal_base`;
-    /// - Consuming predecessor edges destructively so no edge is rescanned in the phase.
+    /// - Consuming predecessor edges destructively.
+    ///
+    /// This does not bound the recursive certificate searches used to validate
+    /// candidate paths and petals; those are protected by a separate work budget.
     pub fn ddfs(&mut self, graph: &Graph, bridge_index: usize, tenacity: usize) -> DdfsResult {
+        if self.search_budget_exhausted() {
+            return DdfsResult::SearchBudgetExceeded;
+        }
         // A caller-supplied tenacity is not itself a certificate. Reject an
         // edge whose currently known parity levels disagree with it before
         // mutating the petal partition or predecessor scan pointers.
@@ -904,6 +943,9 @@ impl MicaliVazirani {
                 left_path,
                 right_path,
             };
+        }
+        if self.search_budget_exhausted() {
+            return DdfsResult::SearchBudgetExceeded;
         }
 
         self.ddfs_epoch += 1;
@@ -958,6 +1000,9 @@ impl MicaliVazirani {
                                     path_v,
                                 };
                             }
+                            if self.search_budget_exhausted() {
+                                return DdfsResult::SearchBudgetExceeded;
+                            }
                             return DdfsResult::Redundant;
                         }
                     } else {
@@ -1005,6 +1050,9 @@ impl MicaliVazirani {
                                     path_v,
                                 };
                             }
+                            if self.search_budget_exhausted() {
+                                return DdfsResult::SearchBudgetExceeded;
+                            }
                             return DdfsResult::Redundant;
                         }
                     } else {
@@ -1023,13 +1071,9 @@ impl MicaliVazirani {
             // an augmenting-path certificate. The certified search above
             // already tried every compatible branch through this bridge.
             if !u_active && !v_active {
-                if let Some((actual_base, cycle_vertices)) = self.certified_petal_cycle(
-                    graph,
-                    bridge_index,
-                    tenacity,
-                    curr_u,
-                    Vec::new(),
-                ) {
+                if let Some((actual_base, cycle_vertices)) =
+                    self.certified_petal_cycle(graph, bridge_index, tenacity, curr_u, Vec::new())
+                {
                     self.union_petal(actual_base, &cycle_vertices);
                     return DdfsResult::Petal {
                         base: actual_base,
@@ -1037,6 +1081,9 @@ impl MicaliVazirani {
                         path_u,
                         path_v,
                     };
+                }
+                if self.search_budget_exhausted() {
+                    return DdfsResult::SearchBudgetExceeded;
                 }
                 return DdfsResult::Redundant;
             }
@@ -1119,6 +1166,9 @@ impl MicaliVazirani {
 
         // 2. Try candidate bases from representative_cycle
         for &cand in &representative_cycle {
+            if self.search_budget_exhausted() {
+                return None;
+            }
             if cand != suggested_base {
                 if let Some(cycle) = self.try_certified_petal_cycle_with_base(
                     graph,
@@ -1161,9 +1211,8 @@ impl MicaliVazirani {
         base: usize,
         representative_cycle: &[usize],
     ) -> Option<Vec<usize>> {
-        let base_distance = self
-            .even_level[base]
-            .or_else(|| self.min_level[base].filter(|&l| l % 2 == 0))?;
+        let base_distance =
+            self.even_level[base].or_else(|| self.min_level[base].filter(|&l| l % 2 == 0))?;
         let cycle_len = tenacity.checked_sub(base_distance.checked_mul(2)?)?;
         if cycle_len < 3 || cycle_len % 2 == 0 || cycle_len > graph.n {
             return None;
@@ -1199,8 +1248,14 @@ impl MicaliVazirani {
         seen: &mut [bool],
         path: &mut Vec<usize>,
     ) -> Option<Vec<usize>> {
+        if !self.consume_search_node() {
+            return None;
+        }
         let bridge = &graph.edges[bridge_index];
         for &edge_index in graph.adj_edges(current) {
+            if self.search_budget_exhausted() {
+                return None;
+            }
             let edge = &graph.edges[edge_index];
             let next = if edge.u == current { edge.v } else { edge.u };
             if (self.mate[current] == Some(next)) != expect_matched {
@@ -1339,15 +1394,18 @@ impl MicaliVazirani {
                         && let Some(shorter) =
                             self.shortest_augmenting_path(graph, bottleneck_tenacity - 2)
                     {
+                        self.ensure_search_budget()?;
                         return Err(MicaliVaziraniError::NonShortestAugmentation {
                             proposed: bottleneck_tenacity,
                             actual: shorter.len() - 1,
                         });
                     }
+                    self.ensure_search_budget()?;
                     self.apply_augmentation(&path);
                     augmentations += 1;
                 }
             }
+            self.ensure_search_budget()?;
         }
 
         Ok(augmentations)
@@ -1355,14 +1413,21 @@ impl MicaliVazirani {
 
     /// Independent certificate oracle, used only to *reject* invalid phase
     /// claims. It never supplies a replacement augmentation to the MV search.
-    /// Enumerating simple alternating paths is exponential in the worst case.
+    /// Enumerating simple alternating paths is exponential in the worst case;
+    /// recursive exploration is stopped by the solver's shared state budget.
     fn shortest_augmenting_path(&self, graph: &Graph, maximum_length: usize) -> Option<Vec<usize>> {
         if maximum_length == 0 || self.mate.iter().filter(|mate| mate.is_none()).count() < 2 {
             return None;
         }
         let upper = maximum_length.min(graph.n.saturating_sub(1));
         for length in (1..=upper).step_by(2) {
+            if self.search_budget_exhausted() {
+                return None;
+            }
             for root in 0..graph.n {
+                if self.search_budget_exhausted() {
+                    return None;
+                }
                 if self.mate[root].is_some() {
                     continue;
                 }
@@ -1390,10 +1455,16 @@ impl MicaliVazirani {
         seen: &mut [bool],
         path: &mut Vec<usize>,
     ) -> bool {
+        if !self.consume_search_node() {
+            return false;
+        }
         if remaining == 0 {
             return self.mate[current].is_none();
         }
         for &edge_index in graph.adj_edges(current) {
+            if self.search_budget_exhausted() {
+                return false;
+            }
             let edge = &graph.edges[edge_index];
             let next = if edge.u == current { edge.v } else { edge.u };
             if seen[next] || (self.mate[current] == Some(next)) != expect_matched {
@@ -1568,10 +1639,16 @@ impl MicaliVazirani {
         backward: &mut Vec<usize>,
         on_root: &mut F,
     ) -> bool {
+        if !self.consume_search_node() {
+            return false;
+        }
         if remaining == 0 {
             return self.mate[current].is_none() && on_root(backward);
         }
         for &edge_index in graph.adj_edges(current) {
+            if self.search_budget_exhausted() {
+                return false;
+            }
             let edge = &graph.edges[edge_index];
             let next = if edge.u == current { edge.v } else { edge.u };
             if next == current || seen[next] || (self.mate[current] == Some(next)) != expect_matched
@@ -1739,6 +1816,9 @@ impl MicaliVazirani {
         need_even: bool,
         visited: &mut [bool],
     ) -> Option<Vec<usize>> {
+        if !self.consume_search_node() {
+            return None;
+        }
         if need_even {
             if self.mate[curr].is_none() {
                 // Base case: exposed root
@@ -1756,6 +1836,9 @@ impl MicaliVazirani {
             // Need an odd step into curr (must come via an unmatched edge).
             // Option A: follow direct predecessor props
             for &edge_idx in &self.predecessor[curr] {
+                if self.search_budget_exhausted() {
+                    return None;
+                }
                 let edge = &graph.edges[edge_idx];
                 let p = if edge.u == curr { edge.v } else { edge.u };
 
@@ -1800,6 +1883,9 @@ impl MicaliVazirani {
 
             // Option B: if curr is inside a petal, route around the odd cycle via the petal bridge
             for &petal_id in self.petals_by_vertex[curr].iter().rev() {
+                if self.search_budget_exhausted() {
+                    return None;
+                }
                 let petal = &self.petals[petal_id];
                 if let Some(cycle_walk) = self.unroll_petal_cycle_to_base(petal, curr, false) {
                     let can_use = cycle_walk
@@ -1853,6 +1939,29 @@ impl MicaliVazirani {
             return Err(MicaliVaziraniError::GraphChanged);
         }
         Ok(())
+    }
+
+    fn consume_search_node(&self) -> bool {
+        let remaining = self.search_nodes_remaining.get();
+        if remaining == 0 {
+            return false;
+        }
+        self.search_nodes_remaining.set(remaining - 1);
+        true
+    }
+
+    fn search_budget_exhausted(&self) -> bool {
+        self.search_nodes_remaining.get() == 0
+    }
+
+    fn ensure_search_budget(&self) -> Result<(), MicaliVaziraniError> {
+        if self.search_budget_exhausted() {
+            Err(MicaliVaziraniError::SearchBudgetExceeded {
+                limit: EXPERIMENTAL_SEARCH_NODE_BUDGET,
+            })
+        } else {
+            Ok(())
+        }
     }
 
     fn begin_phase(&mut self) {
@@ -2011,5 +2120,24 @@ mod certificate_tests {
         assert_eq!(solver.shortest_augmenting_path(&graph, 5), Some(vec![0, 5]));
         assert!(solver.valid_augmenting_path(&graph, 2, 5, &[false; 6], &[0, 1, 2, 3, 4, 5],));
         assert!(!solver.valid_augmenting_path(&graph, 2, 5, &[false; 6], &[0, 1, 2, 1, 4, 5],));
+    }
+
+    #[test]
+    fn recursive_certificate_search_stops_at_its_work_budget() {
+        let graph = Graph::from_edges(4, vec![Edge::new(0, 1, None), Edge::new(1, 2, None)]);
+        let mut solver = MicaliVazirani::new(&graph);
+        solver.search_nodes_remaining.set(1);
+        let mut seen = vec![false; graph.n];
+        let mut path = vec![0];
+        seen[0] = true;
+
+        assert!(!solver.find_exact_augmenting_path(&graph, 0, 3, false, &mut seen, &mut path));
+        assert_eq!(
+            solver.ensure_search_budget(),
+            Err(MicaliVaziraniError::SearchBudgetExceeded {
+                limit: EXPERIMENTAL_SEARCH_NODE_BUDGET
+            })
+        );
+        assert_eq!(solver.ddfs(&graph, 0, 1), DdfsResult::SearchBudgetExceeded);
     }
 }

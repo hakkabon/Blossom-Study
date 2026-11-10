@@ -137,6 +137,11 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::MaxCardinality { input, output } => {
             let graph = load_graph(&input)?;
+            if matches!(cli.algorithm, Algorithm::MicaliVazirani) {
+                eprintln!(
+                    "Warning: Micali–Vazirani is experimental, its completeness is unestablished, and its recursive searches are bounded; it may return an error."
+                );
+            }
             let result = cli
                 .algorithm
                 .max_cardinality(&graph)
@@ -285,7 +290,12 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
             for algo_name in &config.algorithms {
                 let result = match algo_name.to_lowercase().as_str() {
                     "fast_blossom" | "fast" => Algorithm::FastBlossom.max_cardinality(&graph),
-                    "micali_vazirani" | "mv" => Algorithm::MicaliVazirani.max_cardinality(&graph),
+                    "micali_vazirani" | "mv" => {
+                        eprintln!(
+                            "Skipping {algo_name}: Micali–Vazirani is experimental and excluded from the generic end-to-end benchmark."
+                        );
+                        continue;
+                    }
                     "primal_dual" | "primal-dual" | "mwpm" => {
                         WeightedAlgorithm::PrimalDual.min_weight_perfect(&graph)
                     }
@@ -360,7 +370,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
     println!(
         "Commands: load <file>, max, min, graph, edges, result, save <file>, algo <name>, quit"
     );
-    println!("Algorithms: fast_blossom, micali_vazirani (level-search milestone)");
+    println!("Algorithms: fast_blossom, micali_vazirani (experimental; may return an error)");
     println!("File formats: JSON (.json), DIMACS (.dimacs, .dat, .txt)");
     println!();
 
@@ -400,6 +410,11 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                             }
                         };
                         println!("Algorithm set to: {:?}", current_algorithm);
+                        if matches!(current_algorithm, Algorithm::MicaliVazirani) {
+                            println!(
+                                "Warning: this experimental solver may return an error and is excluded from generic benchmarks."
+                            );
+                        }
                     }
                     "load" => {
                         if parts.len() < 2 {

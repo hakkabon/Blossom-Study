@@ -42,7 +42,7 @@ blossom-study/
 
 ### Working Features
 - 🧪 **Gabow-inspired cardinality** (`gabow`): phased alternating search with blossom contraction and an Edmonds-style single-path search when a phase stalls. It does **not** construct the paper's tight-edge auxiliary graph $H$ or establish its $O(m\sqrt n)$ bound. An eight-vertex false-optimum regression is retained.
-- 🧪 **Micali–Vazirani track** (`micali-vazirani`): parity levels, bridge tenacity, DDFS proposals, and petal unrolling. An independent exact validator rejects an unproved maximum; a second ten-vertex nested-petal case still returns `UncertifiedOptimality`. Its validation searches can be exponential, so the theoretical MV bound does **not** apply to this implementation.
+- ⚠️ **Experimental Micali–Vazirani research track** (`micali-vazirani`): parity levels, bridge tenacity, DDFS proposals, and petal unrolling. Nested-petal discovery and the complete algorithm have not been independently established as complete. Recursive path and petal certificates share a fixed 100,000-state safety budget; exceeding it returns an error rather than risking an unbounded search or claiming a maximum. This is not a dependable general-purpose solver and the published MV time bound does **not** apply.
 - ✅ **Conventional Blossom Cardinality** (`fast-blossom`): Edmonds blossom contraction with timestamp-based LCA and DSU.
 - ✅ **Hopcroft–Karp Bipartite Matching** (`hopcroft-karp`): $O(m \sqrt{n})$ multi-phase bipartite maximum cardinality matching.
 - ✅ **O(V³) Minimum-Weight Perfect Matching**:
@@ -57,7 +57,7 @@ blossom-study/
 
 ### Performance interpretation
 
-Use the benchmark commands below for measurements on your machine. The earlier debug-build table was removed because it predates Gabow's stall check and mixes MV's exact validator with the phased search. Neither timing constitutes a comparison with the published Gabow implementation or evidence for an asymptotic bound. Check matching correctness before comparing times.
+Use the benchmark commands below for measurements on your machine. The generic runner compares completed solvers only; it excludes both experimental phased cardinality tracks. Criterion includes a separately named MV level-search-only development group, which is not an end-to-end solver benchmark. No MV timing constitutes a comparison with the published algorithm or evidence for its asymptotic bound. Check matching correctness before comparing times.
 
 ---
 
@@ -75,7 +75,7 @@ cargo run -- max-cardinality -i graph.json
 # Experimental Gabow-inspired cardinality track
 cargo run -- --algorithm gabow max-cardinality -i graph.json
 
-# Maximum cardinality matching using Micali-Vazirani
+# Experimental Micali–Vazirani research track (may return an error)
 cargo run -- --algorithm micali-vazirani max-cardinality -i graph.json
 
 # Minimum weight perfect matching with the established baseline
@@ -111,7 +111,7 @@ cargo bench --bench matching
 ### General-graph maximum-cardinality solvers
 
 - **`fast-blossom` — conventional Edmonds baseline.** Searches from exposed vertices, contracts odd cycles around a lowest common ancestor, and augments one path at a time. It is the simple general-graph comparator, not an MV or Gabow implementation. Literature: [Edmonds (1965)](https://doi.org/10.4153/CJM-1965-045-4); [Galil's survey (1986)](https://doi.org/10.1145/6462.6502).
-- **`micali-vazirani` — experimental MV track.** Alternating parity levels and tenacity-ordered bridges feed a DDFS/petal search; certified paths are unrolled and augmented in phases. An independent exact path search *validates* shortestness and termination but never supplies a matching. The second ten-vertex regression remains unresolved and returns `UncertifiedOptimality`. The exact validation prevents a claimed $O(m\sqrt n)$ implementation. Literature: [Micali–Vazirani (1980)](https://doi.org/10.1109/SFCS.1980.12); [Vazirani's proof](https://arxiv.org/abs/2012.03582).
+- **`micali-vazirani` — experimental MV research track, not a production solver.** Alternating parity levels and tenacity-ordered bridges feed a DDFS/petal search; certified paths are unrolled and augmented in phases. Nested-petal behavior is covered by targeted regressions, but complete correctness has not been established. Exact recursive certificate searches are capped at 100,000 explored states per solve and report `SearchBudgetExceeded` if they reach the cap. This prevents unbounded fallback work but can reject otherwise solvable inputs; it does not establish completeness or the published $O(m\sqrt n)$ bound. The generic benchmark runner excludes this solver; Criterion measures only its explicitly labeled level-search phase. Literature: [Micali–Vazirani (1980)](https://doi.org/10.1109/SFCS.1980.12); [Vazirani's proof](https://arxiv.org/abs/2012.03582).
 - **`gabow` — experimental Gabow-inspired track.** Uses a multi-root alternating search and DSU blossom contraction, then tries candidate augmenting bridges. When the phased search stalls, an Edmonds-style single-path search checks for a missed augmentation. This is **not** the algorithm of [Ansaripour, Danaei, and Mehlhorn (2024)](https://arxiv.org/abs/2409.14849): their phase one maintains dual/tight-edge information and builds an auxiliary graph $H$; phase two finds paths in $H$. No $O(m\sqrt n)$ bound is claimed for this Rust version.
 
 ### Bipartite solvers
