@@ -14,7 +14,7 @@ blossom-study/
 │   └── algorithms/
 │       ├── mod.rs          # Common types and traits
 │       ├── general_cardinality.rs # Named general-graph cardinality solver registry
-│       ├── gabow_cardinality.rs # Experimental Gabow-inspired cardinality solver
+│       ├── gabow_heuristic.rs # Gabow-inspired heuristic cardinality solver
 │       ├── micali_vazirani.rs # Experimental phased Micali–Vazirani track
 │       ├── fast_blossom.rs # Conventional blossom cardinality baseline
 │       ├── hopcroft_karp.rs # Bipartite maximum-cardinality solver
@@ -27,10 +27,11 @@ blossom-study/
 │       ├── sparse_mwpm.rs  # Sparse event-driven experiment
 │       └── korte_vygen.rs  # Reference-only implementation
 ├── tests/
-│   ├── gabow_cardinality_test.rs # Gabow cardinality test suite & oracle verification
+│   ├── gabow_cardinality_test.rs # Gabow-inspired heuristic tests
 │   ├── micali_vazirani_test.rs # Micali–Vazirani tests, nested petals, and oracle checks
 │   ├── hopcroft_karp_test.rs # Bipartite cardinality/oracle tests
 │   ├── hungarian_test.rs   # Bipartite assignment/oracle tests
+│   ├── oracle_comparison_test.rs # Independent exact oracles for cardinality and weighted solvers
 │   ├── matching.rs         # Integration and cross-implementation tests
 │   └── data/               # Test graph fixtures
 ├── bench/
@@ -54,11 +55,17 @@ blossom-study/
   - `sparse-blossom`: Sparse event-driven adjacency/map implementation.
 - ✅ **Hungarian Bipartite Assignment**: $O(k^3)$ primal-dual shortest augmenting paths with exact cost scaling.
 - ✅ **Graph Generators & Serialization**: Complete, sparse, grid, and planted matching generators with JSON serialization.
-- ✅ **Small-graph test oracles**: cardinality solvers are checked exhaustively through six vertices; larger regressions remain important because that coverage does not prove general correctness.
+- ✅ **Independent exact test oracles**: registered general-cardinality solvers are checked on every simple graph through six vertices. All five weighted general-graph solvers are checked against an independent dynamic-programming oracle on reproducible sparse instances up to ten vertices, with odd, infeasible, and empty graph cases. These finite tests provide regression coverage, not a proof of correctness on arbitrary graphs.
 
 ### Performance interpretation
 
 Use the benchmark commands below for measurements on your machine. The generic runner compares completed solvers only; it excludes both experimental phased cardinality tracks. Criterion includes a separately named MV level-search-only development group, which is not an end-to-end solver benchmark. No MV timing constitutes a comparison with the published algorithm or evidence for its asymptotic bound. Check matching correctness before comparing times.
+
+Run the independent exact-oracle comparisons with:
+
+```bash
+cargo test --test oracle_comparison_test
+```
 
 ---
 

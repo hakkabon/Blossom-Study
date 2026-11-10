@@ -1,17 +1,16 @@
 use blossom_study::{
-    Edge, FastBlossomMatching, GabowCardinality, Graph, MicaliVazirani,
-    gabow_maximum_cardinality_matching,
+    Edge, FastBlossomMatching, GabowHeuristic, Graph, MicaliVazirani, gabow_heuristic_matching,
 };
 
 #[test]
 fn gabow_solves_empty_and_single_edge_graphs() {
     let empty_graph = Graph::from_edges(0, vec![]);
-    let res = gabow_maximum_cardinality_matching(&empty_graph);
+    let res = gabow_heuristic_matching(&empty_graph);
     assert_eq!(res.edges.len(), 0);
     assert!(res.is_perfect);
 
     let single_edge = Graph::from_edges(2, vec![Edge::new(0, 1, None)]);
-    let res = gabow_maximum_cardinality_matching(&single_edge);
+    let res = gabow_heuristic_matching(&single_edge);
     assert_eq!(res.edges.len(), 1);
     assert!(res.is_perfect);
 
@@ -23,7 +22,7 @@ fn gabow_solves_empty_and_single_edge_graphs() {
             Edge::new(2, 0, None),
         ],
     );
-    let res = gabow_maximum_cardinality_matching(&triangle);
+    let res = gabow_heuristic_matching(&triangle);
     assert_eq!(res.edges.len(), 1);
     assert!(!res.is_perfect);
 }
@@ -42,7 +41,7 @@ fn gabow_solves_pentagon_with_tail() {
             Edge::new(0, 5, None),
         ],
     );
-    let mut solver = GabowCardinality::new(&graph);
+    let mut solver = GabowHeuristic::new(&graph);
     let result = solver.max_cardinality_matching(&graph);
     assert_eq!(result.edges.len(), 3);
     assert!(result.is_perfect);
@@ -65,7 +64,7 @@ fn gabow_solves_nested_blossoms() {
             Edge::new(6, 7, None),
         ],
     );
-    let mut solver = GabowCardinality::new(&graph);
+    let mut solver = GabowHeuristic::new(&graph);
     let result = solver.max_cardinality_matching(&graph);
     assert_eq!(result.edges.len(), 4);
     assert!(result.is_perfect);
@@ -105,7 +104,7 @@ fn gabow_solves_nested_petal_length_nine_graph() {
         Some(2),
         Some(5),
     ];
-    let mut solver = GabowCardinality::with_matching(&graph, initial).unwrap();
+    let mut solver = GabowHeuristic::with_matching(&graph, initial).unwrap();
     let result = solver.max_cardinality_matching(&graph);
     assert_eq!(result.edges.len(), 5);
     assert!(result.is_perfect);
@@ -132,7 +131,7 @@ fn gabow_does_not_stop_at_false_optimum_on_eight_vertices() {
         8,
         pairs.iter().map(|&(u, v)| Edge::new(u, v, None)).collect(),
     );
-    let mut solver = GabowCardinality::new(&graph);
+    let mut solver = GabowHeuristic::new(&graph);
     let result = solver.max_cardinality_matching(&graph);
     assert_eq!(result.edges.len(), 4);
     assert!(result.is_perfect);
@@ -168,7 +167,7 @@ fn gabow_matches_mv_and_fast_blossom_on_diverse_graphs() {
             let mut mv_solver = MicaliVazirani::new(&graph);
             let mv_result = mv_solver.max_cardinality_matching(&graph).unwrap();
 
-            let mut gabow_solver = GabowCardinality::new(&graph);
+            let mut gabow_solver = GabowHeuristic::new(&graph);
             let gabow_result = gabow_solver.max_cardinality_matching(&graph);
 
             assert_eq!(
@@ -235,7 +234,7 @@ fn gabow_agrees_with_exhaustive_small_graph_oracle() {
             );
             let expected = brute_maximum_cardinality(n, &chosen, 0);
 
-            let mut solver = GabowCardinality::new(&graph);
+            let mut solver = GabowHeuristic::new(&graph);
             let result = solver.max_cardinality_matching(&graph);
             assert_eq!(result.edges.len(), expected);
             assert_eq!(result.is_perfect, expected * 2 == n);
