@@ -141,8 +141,9 @@ fn generic_benchmark_runner_labels_and_checks_cardinality_solvers() {
         r#"{
             "graph_sizes": [6],
             "densities": [1.0],
-            "weight_ranges": [[1.0, 2.0]],
-            "runs_per_config": 1,
+            "weight_ranges": [[1.0, 2.0], [-5.0, -4.0]],
+            "runs_per_config": 2,
+            "seed": 12345,
             "algorithms": ["fast_blossom", "gabow", "primal-dual"]
         }"#,
     )
@@ -166,19 +167,123 @@ fn generic_benchmark_runner_labels_and_checks_cardinality_solvers() {
     assert!(stdout.contains("gabow-heuristic"));
     assert!(stdout.contains("minimum-weight-perfect"));
 
+    let results_path = output_path.join("bench_results.json");
     let records: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(output_path.join("bench_results.json"))
-            .expect("benchmark results should exist"),
+        &std::fs::read_to_string(&results_path).expect("benchmark results should exist"),
     )
     .expect("benchmark results should be valid JSON");
-    assert_eq!(records.as_array().unwrap().len(), 3);
-    assert_eq!(records[0]["problem"], "maximum-cardinality");
-    assert_eq!(records[0]["algorithm"], "fast-blossom");
-    assert_eq!(records[1]["algorithm"], "gabow-heuristic");
-    assert_eq!(records[2]["problem"], "minimum-weight-perfect");
+    let records = records.as_array().unwrap();
+    assert_eq!(records.len(), 12);
+    let mut signatures = std::collections::BTreeMap::new();
+    for record in records {
+        assert_eq!(record["seed"], 12345);
+        assert_eq!(record["m"], 15);
+        let run = record["run"].as_u64().unwrap();
+        assert!((1..=2).contains(&run));
+        let range = record["weight_range"].as_array().unwrap();
+        let minimum = range[0].as_f64().unwrap();
+        let maximum = range[1].as_f64().unwrap();
+        let observed_minimum = record["observed_weight_min"].as_f64().unwrap();
+        let observed_maximum = record["observed_weight_max"].as_f64().unwrap();
+        assert!(observed_minimum >= minimum && observed_maximum < maximum);
 
-    std::fs::remove_file(output_path.join("bench_results.json")).unwrap();
+        let key = (
+            minimum.to_bits(),
+            run,
+            record["algorithm"].as_str().unwrap().to_string(),
+        );
+        signatures.insert(key, record["graph_signature"].as_str().unwrap().to_string());
+    }
+    assert_eq!(signatures.len(), 12);
+    for range_minimum in [1.0_f64, -5.0] {
+        for run in 1..=2 {
+            let fast = signatures
+                .get(&(range_minimum.to_bits(), run, "fast-blossom".to_string()))
+                .unwrap();
+            let gabow = signatures
+                .get(&(range_minimum.to_bits(), run, "gabow-heuristic".to_string()))
+                .unwrap();
+            let weighted = signatures
+                .get(&(range_minimum.to_bits(), run, "primal-dual".to_string()))
+                .unwrap();
+            assert_eq!(fast, gabow);
+            assert_eq!(fast, weighted);
+        }
+        let run_one = signatures
+            .get(&(range_minimum.to_bits(), 1, "fast-blossom".to_string()))
+            .unwrap();
+        let run_two = signatures
+            .get(&(range_minimum.to_bits(), 2, "fast-blossom".to_string()))
+            .unwrap();
+        assert_ne!(run_one, run_two, "each run should use a fresh graph");
+    }
+
+    let first_run_signatures: Vec<_> = records
+        .iter()
+        .map(|record| record["graph_signature"].as_str().unwrap())
+        .collect();
+    let repeated = run(&[
+        "bench",
+        "--config",
+        config_path.to_str().expect("UTF-8 config path"),
+        "--output",
+        output_path.to_str().expect("UTF-8 output path"),
+    ]);
+    assert!(repeated.status.success());
+    let repeated_records: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(&results_path).expect("second benchmark results should exist"),
+    )
+    .expect("second benchmark results should be valid JSON");
+    let repeated_signatures: Vec<_> = repeated_records
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|record| record["graph_signature"].as_str().unwrap())
+        .collect();
+    assert_eq!(first_run_signatures, repeated_signatures);
+
+    std::fs::remove_file(results_path).unwrap();
     std::fs::remove_dir(&output_path).unwrap();
+    std::fs::remove_file(config_path).unwrap();
+    std::fs::remove_dir(temp_root).unwrap();
+}
+
+#[test]
+fn generic_benchmark_runner_rejects_zero_runs() {
+    let temp_root = std::env::temp_dir().join(format!(
+        "blossom-study-invalid-benchmark-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir(&temp_root).expect("temporary benchmark directory should be created");
+    let config_path = temp_root.join("config.json");
+    std::fs::write(
+        &config_path,
+        r#"{
+            "graph_sizes": [4],
+            "densities": [1.0],
+            "weight_ranges": [[1.0, 2.0]],
+            "runs_per_config": 0,
+            "algorithms": ["fast_blossom"]
+        }"#,
+    )
+    .expect("benchmark config should be written");
+
+    let output = run(&[
+        "bench",
+        "--config",
+        config_path.to_str().expect("UTF-8 config path"),
+        "--output",
+        temp_root
+            .join("results")
+            .to_str()
+            .expect("UTF-8 output path"),
+    ]);
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("runs_per_config must be greater than zero")
+    );
+
     std::fs::remove_file(config_path).unwrap();
     std::fs::remove_dir(temp_root).unwrap();
 }

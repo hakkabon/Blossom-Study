@@ -127,12 +127,21 @@ impl MatchingResult {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct MatchingMetadata {
+    /// Algorithm-specific work counter; its unit is documented per solver and
+    /// is not comparable across implementations. Zero may mean uninstrumented.
     pub iterations: usize,
+    /// Number of augmentations, or the known perfect-matching cardinality for
+    /// adapters that do not expose the solver's internal count.
     #[serde(default)]
     pub augmentations: usize,
+    /// Number of blossom contractions when instrumented; otherwise zero.
     pub blossoms_created: usize,
+    /// Number of blossom expansions when instrumented; otherwise zero.
     pub blossoms_expanded: usize,
+    /// Number of dual-adjustment steps when instrumented; otherwise zero.
     pub dual_updates: usize,
+    /// Solver-reported wall time, in milliseconds. This is distinct from
+    /// Criterion's externally measured benchmark duration.
     pub runtime_ms: f64,
 }
 

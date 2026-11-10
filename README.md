@@ -127,7 +127,40 @@ isolated level-search phase is benchmarked. Bipartite cardinality and weighted
 perfect-matching comparisons remain separate because they measure different
 problems. Criterion performs matching validity checks and requires weighted
 solvers on each generated instance to agree on the reported optimum before it
-starts timing the comparison.
+starts timing the comparison. Correctness preflight failures are written to
+stderr with the affected graph/solver and the corresponding timings are
+skipped; a failure during a timed invocation aborts that sample rather than
+being accepted as a timing result.
+
+The configurable CLI runner uses every `weight_ranges` entry and executes
+`runs_per_config` fresh graph instances for each size, density, and weight
+range. All selected solvers share each instance. Configure `seed` to make the
+generated sequence repeatable; each result record includes the seed, run,
+requested and observed weight bounds, and a graph signature. Density is a
+fraction in `[0, 1]`, and ranges use inclusive lower and exclusive upper
+bounds.
+
+### Interpreting solver counters
+
+`MatchingMetadata` uses one shared output shape, not shared counter semantics.
+Do not compare these counters across algorithms.
+In particular, zero means either “not applicable” or “not instrumented,” not
+necessarily that no such work occurred. Several adapters derive an
+augmentation count from the returned perfect matching rather than measuring
+internal augmentation operations. `runtime_ms` is the solver's own elapsed-time
+measurement; use Criterion's reported measurements for benchmark comparisons.
+
+| Solver | `iterations` | `augmentations` | Other counters |
+|---|---|---|---|
+| `fast-blossom` | Alternating-forest queue vertices processed | Successful augmenting paths | `blossoms_created` counts contraction events; expansion and dual-update counters are uninstrumented |
+| `gabow-heuristic` | Outer heuristic search phases | Paths augmented, including fallback single-path augmentations | Blossom contractions counted; expansion and dual-update counters are uninstrumented |
+| `micali-vazirani` | Solver phases | Paths augmented | Petals/blossoms created counted; expansion and dual-update counters are uninstrumented. The Criterion development group measures only level search and has no end-to-end solver counter comparison |
+| `hopcroft-karp` | Adjacency entries examined by BFS and DFS | Successful shortest augmenting paths | Blossom and dual-update counters are not applicable |
+| Hungarian | Candidate row/column entries examined by the assignment search | Rows inserted into the assignment, one augmentation attempt per left vertex | `dual_updates` counts potential-adjustment steps; blossom counters are not applicable |
+| `primal-dual` | Not instrumented (`0`) | Reported perfect-matching cardinality, `n / 2`, not an internal counter | Blossom and dual-update counters are not exposed by the wrapped dependency |
+| `blossom-tree` | Not instrumented (`0`) | Reported perfect-matching cardinality, `n / 2`, not an internal counter | Blossom and dual-update counters are not instrumented |
+| `blossom-engine`, `cherry-tree` | Edge scans | Successful augmentations | Blossom creations/expansions and dual adjustments are counted by the implementation |
+| `sparse-blossom` | Search-queue entries processed | Reported perfect-matching cardinality, `n / 2`, not an internal counter | Blossom creations/expansions and dual adjustments are counted; its augmentation counter is inferred |
 
 ---
 

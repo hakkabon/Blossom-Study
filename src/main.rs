@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use blossom_study::{algorithms, graph};
 use clap::{Parser, Subcommand, ValueEnum};
+use rand::{Rng, SeedableRng, rngs::StdRng, seq::SliceRandom};
 use rustyline::DefaultEditor;
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -260,139 +261,182 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
         blossom_study::benchmark::BenchConfig::default()
     };
 
+    validate_benchmark_config(&config)?;
+
     println!("Running Blossom Benchmark Suite");
     println!("Output directory: {}", output_dir);
     println!("Graph sizes: {:?}", config.graph_sizes);
     println!("Densities: {:?}", config.densities);
+    println!("Weight ranges: {:?}", config.weight_ranges);
+    println!("Runs per configuration: {}", config.runs_per_config);
+    println!("Graph seed: {}", config.seed);
     println!("Algorithms: {:?}", config.algorithms);
     println!();
 
     std::fs::create_dir_all(output_dir)?;
 
     println!(
-        "{:<24} | {:<18} | {:>6} | {:>8} | {:>10} | {:>8} | {:>10} | {:>8}",
-        "Problem", "Algorithm", "V", "E", "Weight", "Size", "Time (ms)", "Perfect"
+        "{:<24} | {:<18} | {:>5} | {:>10} | {:>6} | {:>8} | {:>10} | {:>8} | {:>10} | {:>8}",
+        "Problem",
+        "Algorithm",
+        "Run",
+        "Weight range",
+        "V",
+        "E",
+        "Weight",
+        "Size",
+        "Time (ms)",
+        "Perfect"
     );
     println!(
-        "{:-<24}-|-{:-<18}-|-{:-<6}-|-{:-<8}-|-{:-<10}-|-{:-<8}-|-{:-<10}-|-{:-<8}",
-        "", "", "", "", "", "", "", ""
+        "{:-<24}-|-{:-<18}-|-{:-<5}-|-{:-<10}-|-{:-<6}-|-{:-<8}-|-{:-<10}-|-{:-<8}-|-{:-<10}-|-{:-<8}",
+        "", "", "", "", "", "", "", "", "", ""
     );
 
     let mut records = Vec::new();
+    let mut rng = StdRng::seed_from_u64(config.seed);
 
     for &n in &config.graph_sizes {
         for &density in &config.densities {
-            let m = (((n * (n.saturating_sub(1))) as f64 * density * 0.5) as usize).max(1);
-            let graph = if density >= 0.99 {
-                graph::generator::complete_graph(n, (1.0, 100.0))
-            } else {
-                graph::generator::random_sparse(n, m, (1.0, 100.0))
-            };
-
-            let mut expected_cardinality: Option<usize> = None;
-            let mut expected_weight: Option<f64> = None;
-            for algo_name in &config.algorithms {
-                let (problem, canonical_name, result) = match algo_name.to_lowercase().as_str() {
-                    "fast_blossom" | "fast" => (
-                        "maximum-cardinality",
-                        "fast-blossom",
-                        Algorithm::FastBlossom.max_cardinality(&graph),
-                    ),
-                    "gabow" | "gabow_heuristic" | "gabow-heuristic" => (
-                        "maximum-cardinality",
-                        "gabow-heuristic",
-                        Algorithm::Gabow.max_cardinality(&graph),
-                    ),
-                    "micali_vazirani" | "mv" => {
-                        eprintln!(
-                            "Skipping {algo_name}: Micali–Vazirani is experimental and excluded from the generic end-to-end benchmark."
-                        );
-                        continue;
-                    }
-                    "primal_dual" | "primal-dual" | "mwpm" => (
-                        "minimum-weight-perfect",
-                        "primal-dual",
-                        WeightedAlgorithm::PrimalDual.min_weight_perfect(&graph),
-                    ),
-                    "blossom_engine" | "blossom-engine" => (
-                        "minimum-weight-perfect",
-                        "blossom-engine",
-                        WeightedAlgorithm::BlossomEngine.min_weight_perfect(&graph),
-                    ),
-                    "sparse_blossom" | "sparse-blossom" | "sparse" => (
-                        "minimum-weight-perfect",
-                        "sparse-blossom",
-                        WeightedAlgorithm::SparseBlossom.min_weight_perfect(&graph),
-                    ),
-                    "blossom_tree" | "blossom-tree" => (
-                        "minimum-weight-perfect",
-                        "blossom-tree",
-                        WeightedAlgorithm::BlossomTree.min_weight_perfect(&graph),
-                    ),
-                    "cherry_tree" | "cherry-tree" => (
-                        "minimum-weight-perfect",
-                        "cherry-tree",
-                        WeightedAlgorithm::CherryTree.min_weight_perfect(&graph),
-                    ),
-                    _ => anyhow::bail!("Unknown benchmark algorithm '{algo_name}'"),
-                };
-
-                let res = match result {
-                    Ok(result) => result,
-                    Err(error) => {
-                        eprintln!("Skipping {algo_name} for n={n}, density={density}: {error}");
-                        continue;
-                    }
-                };
-                res.validate(&graph).map_err(|error| {
-                    anyhow::anyhow!("{canonical_name} returned an invalid result: {error}")
-                })?;
-
-                match problem {
-                    "maximum-cardinality" => match expected_cardinality {
-                        Some(expected) if res.edges.len() != expected => anyhow::bail!(
-                            "{canonical_name} returned cardinality {}, but another selected cardinality solver returned {expected} for n={n}, density={density}",
-                            res.edges.len()
-                        ),
-                        None => expected_cardinality = Some(res.edges.len()),
-                        _ => {}
-                    },
-                    "minimum-weight-perfect" => match expected_weight {
-                        Some(expected)
-                            if (res.total_weight - expected).abs()
-                                > 1e-9 * expected.abs().max(res.total_weight.abs()).max(1.0) =>
+            for &(weight_min, weight_max) in &config.weight_ranges {
+                for run in 0..config.runs_per_config {
+                    let graph =
+                        generate_benchmark_graph(n, density, (weight_min, weight_max), &mut rng);
+                    let observed_weight_min = graph
+                        .edges
+                        .iter()
+                        .map(graph::Edge::weight_or_one)
+                        .reduce(f64::min);
+                    let observed_weight_max = graph
+                        .edges
+                        .iter()
+                        .map(graph::Edge::weight_or_one)
+                        .reduce(f64::max);
+                    let graph_signature = benchmark_graph_signature(&graph);
+                    let mut expected_cardinality: Option<usize> = None;
+                    let mut expected_weight: Option<f64> = None;
+                    for algo_name in &config.algorithms {
+                        let (problem, canonical_name, result) = match algo_name
+                            .to_lowercase()
+                            .as_str()
                         {
-                            anyhow::bail!(
-                                "{canonical_name} returned weight {}, but another selected weighted solver returned {expected} for n={n}, density={density}",
-                                res.total_weight
-                            )
+                            "fast_blossom" | "fast" => (
+                                "maximum-cardinality",
+                                "fast-blossom",
+                                Algorithm::FastBlossom.max_cardinality(&graph),
+                            ),
+                            "gabow" | "gabow_heuristic" | "gabow-heuristic" => (
+                                "maximum-cardinality",
+                                "gabow-heuristic",
+                                Algorithm::Gabow.max_cardinality(&graph),
+                            ),
+                            "micali_vazirani" | "mv" => {
+                                eprintln!(
+                                    "Skipping {algo_name}: Micali–Vazirani is experimental and excluded from the generic end-to-end benchmark."
+                                );
+                                continue;
+                            }
+                            "primal_dual" | "primal-dual" | "mwpm" => (
+                                "minimum-weight-perfect",
+                                "primal-dual",
+                                WeightedAlgorithm::PrimalDual.min_weight_perfect(&graph),
+                            ),
+                            "blossom_engine" | "blossom-engine" => (
+                                "minimum-weight-perfect",
+                                "blossom-engine",
+                                WeightedAlgorithm::BlossomEngine.min_weight_perfect(&graph),
+                            ),
+                            "sparse_blossom" | "sparse-blossom" | "sparse" => (
+                                "minimum-weight-perfect",
+                                "sparse-blossom",
+                                WeightedAlgorithm::SparseBlossom.min_weight_perfect(&graph),
+                            ),
+                            "blossom_tree" | "blossom-tree" => (
+                                "minimum-weight-perfect",
+                                "blossom-tree",
+                                WeightedAlgorithm::BlossomTree.min_weight_perfect(&graph),
+                            ),
+                            "cherry_tree" | "cherry-tree" => (
+                                "minimum-weight-perfect",
+                                "cherry-tree",
+                                WeightedAlgorithm::CherryTree.min_weight_perfect(&graph),
+                            ),
+                            _ => anyhow::bail!("Unknown benchmark algorithm '{algo_name}'"),
+                        };
+
+                        let res = match result {
+                            Ok(result) => result,
+                            Err(error) => {
+                                eprintln!(
+                                    "Skipping {algo_name} for n={n}, density={density}: {error}"
+                                );
+                                continue;
+                            }
+                        };
+                        res.validate(&graph).map_err(|error| {
+                            anyhow::anyhow!("{canonical_name} returned an invalid result: {error}")
+                        })?;
+
+                        match problem {
+                            "maximum-cardinality" => match expected_cardinality {
+                                Some(expected) if res.edges.len() != expected => anyhow::bail!(
+                                    "{canonical_name} returned cardinality {}, but another selected cardinality solver returned {expected} for n={n}, density={density}",
+                                    res.edges.len()
+                                ),
+                                None => expected_cardinality = Some(res.edges.len()),
+                                _ => {}
+                            },
+                            "minimum-weight-perfect" => match expected_weight {
+                                Some(expected)
+                                    if (res.total_weight - expected).abs()
+                                        > 1e-9
+                                            * expected
+                                                .abs()
+                                                .max(res.total_weight.abs())
+                                                .max(1.0) =>
+                                {
+                                    anyhow::bail!(
+                                        "{canonical_name} returned weight {}, but another selected weighted solver returned {expected} for n={n}, density={density}",
+                                        res.total_weight
+                                    )
+                                }
+                                None => expected_weight = Some(res.total_weight),
+                                _ => {}
+                            },
+                            _ => unreachable!("all benchmark algorithms have a problem category"),
                         }
-                        None => expected_weight = Some(res.total_weight),
-                        _ => {}
-                    },
-                    _ => unreachable!("all benchmark algorithms have a problem category"),
+
+                        println!(
+                            "{:<24} | {:<18} | {:>5} | {:>5.1}..{:>4.1} | {:>6} | {:>8} | {:>10.2} | {:>8} | {:>10.3} | {:>8}",
+                            problem,
+                            canonical_name,
+                            run + 1,
+                            weight_min,
+                            weight_max,
+                            graph.n,
+                            graph.edges.len(),
+                            res.total_weight,
+                            res.edges.len(),
+                            res.metadata.runtime_ms,
+                            res.is_perfect
+                        );
+
+                        records.push(serde_json::json!({
+                            "problem": problem,
+                            "algorithm": canonical_name,
+                            "n": graph.n,
+                            "m": graph.edges.len(),
+                            "density": density,
+                            "weight_range": [weight_min, weight_max],
+                            "observed_weight_min": observed_weight_min,
+                            "observed_weight_max": observed_weight_max,
+                            "graph_signature": graph_signature,
+                            "seed": config.seed,
+                            "run": run + 1,
+                            "result": res,
+                        }));
+                    }
                 }
-
-                println!(
-                    "{:<24} | {:<18} | {:>6} | {:>8} | {:>10.2} | {:>8} | {:>10.3} | {:>8}",
-                    problem,
-                    canonical_name,
-                    graph.n,
-                    graph.edges.len(),
-                    res.total_weight,
-                    res.edges.len(),
-                    res.metadata.runtime_ms,
-                    res.is_perfect
-                );
-
-                records.push(serde_json::json!({
-                    "problem": problem,
-                    "algorithm": canonical_name,
-                    "n": graph.n,
-                    "m": graph.edges.len(),
-                    "density": density,
-                    "result": res,
-                }));
             }
         }
     }
@@ -401,6 +445,82 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
     std::fs::write(&out_path, serde_json::to_string_pretty(&records)?)?;
     println!("\nWrote detailed benchmark data to {}", out_path);
     Ok(())
+}
+
+fn validate_benchmark_config(config: &blossom_study::benchmark::BenchConfig) -> Result<()> {
+    if config.graph_sizes.is_empty() {
+        anyhow::bail!("benchmark config must include at least one graph size");
+    }
+    if config.densities.is_empty() {
+        anyhow::bail!("benchmark config must include at least one density");
+    }
+    if config.weight_ranges.is_empty() {
+        anyhow::bail!("benchmark config must include at least one weight range");
+    }
+    if config.algorithms.is_empty() {
+        anyhow::bail!("benchmark config must include at least one algorithm");
+    }
+    if config.runs_per_config == 0 {
+        anyhow::bail!("runs_per_config must be greater than zero");
+    }
+    for &density in &config.densities {
+        if !density.is_finite() || !(0.0..=1.0).contains(&density) {
+            anyhow::bail!("benchmark density must be finite and in [0, 1], got {density}");
+        }
+    }
+    for &(minimum, maximum) in &config.weight_ranges {
+        if !minimum.is_finite() || !maximum.is_finite() || minimum >= maximum {
+            anyhow::bail!(
+                "benchmark weight ranges must have finite bounds with minimum < maximum, got [{minimum}, {maximum})"
+            );
+        }
+    }
+    Ok(())
+}
+
+fn generate_benchmark_graph(
+    n: usize,
+    density: f64,
+    weight_range: (f64, f64),
+    rng: &mut StdRng,
+) -> graph::Graph {
+    let maximum_edges = n.saturating_mul(n.saturating_sub(1)) / 2;
+    let edge_count = if density >= 0.99 {
+        maximum_edges
+    } else {
+        (maximum_edges as f64 * density) as usize
+    };
+    let mut pairs = Vec::with_capacity(maximum_edges);
+    for u in 0..n {
+        for v in (u + 1)..n {
+            pairs.push((u, v));
+        }
+    }
+    if edge_count < maximum_edges {
+        pairs.shuffle(rng);
+        pairs.truncate(edge_count);
+    }
+
+    let edges = pairs
+        .into_iter()
+        .map(|(u, v)| graph::Edge::new(u, v, Some(rng.gen_range(weight_range.0..weight_range.1))))
+        .collect();
+    graph::Graph::from_edges(n, edges)
+}
+
+fn benchmark_graph_signature(graph: &graph::Graph) -> String {
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    let mut mix = |value: u64| {
+        hash ^= value;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    };
+    mix(graph.n as u64);
+    for edge in &graph.edges {
+        mix(edge.u as u64);
+        mix(edge.v as u64);
+        mix(edge.weight_or_one().to_bits());
+    }
+    format!("{hash:016x}")
 }
 
 fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Result<()> {

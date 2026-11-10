@@ -3,6 +3,8 @@
 use crate::{algorithms::MatchingResult, graph::Graph};
 use serde::{Deserialize, Serialize};
 
+pub const DEFAULT_BENCHMARK_SEED: u64 = 0x5eed_cafe_d15c_a11u64;
+
 pub use crate::algorithms::general_cardinality::GENERAL_CARDINALITY_SOLVERS;
 pub use crate::algorithms::general_cardinality::GeneralCardinalitySolver;
 
@@ -44,6 +46,9 @@ pub fn compare_general_cardinality(graph: &Graph) -> Result<Vec<GeneralCardinali
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BenchConfig {
+    /// Seed for reproducible graph generation.
+    #[serde(default = "default_benchmark_seed")]
+    pub seed: u64,
     pub graph_sizes: Vec<usize>,
     pub densities: Vec<f64>,
     pub weight_ranges: Vec<(f64, f64)>,
@@ -51,9 +56,14 @@ pub struct BenchConfig {
     pub algorithms: Vec<String>,
 }
 
+fn default_benchmark_seed() -> u64 {
+    DEFAULT_BENCHMARK_SEED
+}
+
 impl Default for BenchConfig {
     fn default() -> Self {
         Self {
+            seed: DEFAULT_BENCHMARK_SEED,
             graph_sizes: vec![10, 20, 30, 40, 50, 60, 80, 100],
             densities: vec![0.1, 0.3, 0.5, 0.8, 1.0],
             weight_ranges: vec![(1.0, 100.0)],

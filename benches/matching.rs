@@ -1,10 +1,21 @@
 use blossom_study::{
     MatchingResult,
-    algorithms::{FastBlossomMatching, MicaliVazirani, hopcroft_karp_maximum_cardinality_matching},
+    algorithms::{
+        FastBlossomMatching, MicaliVazirani, MicaliVaziraniPhase,
+        hopcroft_karp_maximum_cardinality_matching,
+    },
     benchmark::{GENERAL_CARDINALITY_SOLVERS, compare_general_cardinality},
     graph::{Edge, Graph, generator},
 };
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use std::fmt::Display;
+
+#[inline]
+fn require_timed_result<T, E: Display>(result: Result<T, E>) -> T {
+    result.unwrap_or_else(|error| {
+        panic!("solver failed during timed run after successful preflight; no valid timing sample: {error}")
+    })
+}
 
 fn sparse_general_cardinality_graph(n: usize) -> Graph {
     let mut edges = Vec::with_capacity(4 * n);
@@ -31,8 +42,12 @@ fn cardinality_benchmarks(c: &mut Criterion) {
             } else {
                 sparse_general_cardinality_graph(n)
             };
-            compare_general_cardinality(&graph)
-                .unwrap_or_else(|error| panic!("cardinality precheck failed for n={n}: {error}"));
+            if let Err(error) = compare_general_cardinality(&graph) {
+                eprintln!(
+                    "[benchmark correctness failure] general-cardinality/{shape}, n={n}: {error}; timings skipped"
+                );
+                continue;
+            }
             for solver in GENERAL_CARDINALITY_SOLVERS {
                 group.bench_with_input(BenchmarkId::new(solver.name, n), &graph, |b, graph| {
                     b.iter(|| (solver.solve)(graph))
@@ -48,13 +63,19 @@ fn cardinality_benchmarks(c: &mut Criterion) {
     let mut development = c.benchmark_group("maximum-cardinality/mv-development-phase-1");
     for n in [20, 50, 100, 200] {
         let graph = generator::complete_graph(n, (1.0, 100.0));
+        if let Err(error) = preflight_mv_level_search(&graph, None) {
+            eprintln!(
+                "[benchmark correctness failure] MV development level-search, complete-dense, n={n}: {error}; timing skipped"
+            );
+            continue;
+        }
         development.bench_with_input(
             BenchmarkId::new("mv-level-search/complete-dense", n),
             &graph,
             |b, graph| {
                 b.iter(|| {
                     let mut solver = MicaliVazirani::new(graph);
-                    solver.run_level_search_phase(graph)
+                    require_timed_result(solver.run_level_search_phase(graph))
                 });
             },
         );
@@ -63,13 +84,19 @@ fn cardinality_benchmarks(c: &mut Criterion) {
     for side in [5, 10, 15, 20] {
         let n = side * side;
         let graph = generator::grid_graph(side, side, (1.0, 100.0));
+        if let Err(error) = preflight_mv_level_search(&graph, None) {
+            eprintln!(
+                "[benchmark correctness failure] MV development level-search, sparse-grid, n={n}: {error}; timing skipped"
+            );
+            continue;
+        }
         development.bench_with_input(
             BenchmarkId::new("mv-level-search/sparse-grid", n),
             &graph,
             |b, graph| {
                 b.iter(|| {
                     let mut solver = MicaliVazirani::new(graph);
-                    solver.run_level_search_phase(graph)
+                    require_timed_result(solver.run_level_search_phase(graph))
                 });
             },
         );
@@ -93,15 +120,23 @@ fn cardinality_benchmarks(c: &mut Criterion) {
             }
         }
         let graph = Graph::from_edges(n, edges);
+        if let Err(error) = preflight_mv_level_search(&graph, Some(mate.clone())) {
+            eprintln!(
+                "[benchmark correctness failure] MV development level-search, planted-50pct-matched, n={n}: {error}; timing skipped"
+            );
+            continue;
+        }
         development.bench_with_input(
             BenchmarkId::new("mv-level-search/planted-50pct-matched", n),
             &graph,
             |b, graph| {
                 let initial_mate = mate.clone();
                 b.iter(|| {
-                    let mut solver =
-                        MicaliVazirani::with_matching(graph, initial_mate.clone()).unwrap();
-                    solver.run_level_search_phase(graph)
+                    let mut solver = require_timed_result(MicaliVazirani::with_matching(
+                        graph,
+                        initial_mate.clone(),
+                    ));
+                    require_timed_result(solver.run_level_search_phase(graph))
                 });
             },
         );
@@ -109,99 +144,144 @@ fn cardinality_benchmarks(c: &mut Criterion) {
     development.finish();
 }
 
-fn assert_weighted_results_agree(graph: &Graph, results: &[(&str, MatchingResult)]) {
-    let Some((baseline_name, baseline)) = results.first() else {
-        panic!("weighted comparison must include a solver");
-    };
-    baseline
-        .validate(graph)
-        .unwrap_or_else(|error| panic!("{baseline_name} returned an invalid result: {error}"));
-    assert!(
-        baseline.is_perfect,
-        "{baseline_name} did not return a perfect matching"
-    );
+fn preflight_mv_level_search(
+    graph: &Graph,
+    initial_matching: Option<Vec<Option<usize>>>,
+) -> Result<(), String> {
+    let mut solver = match initial_matching {
+        Some(mate) => MicaliVazirani::with_matching(graph, mate),
+        None => Ok(MicaliVazirani::new(graph)),
+    }
+    .map_err(|error| format!("could not initialize phase benchmark: {error}"))?;
+    solver
+        .run_level_search_phase(graph)
+        .map_err(|error| format!("level-search phase failed: {error}"))?;
+    if solver.phase() != MicaliVaziraniPhase::BridgeProcessing {
+        return Err(format!(
+            "level-search ended in unexpected phase {:?}",
+            solver.phase()
+        ));
+    }
+    Ok(())
+}
 
-    for (name, result) in &results[1..] {
+fn check_weighted_results(
+    graph: &Graph,
+    results: &[(&str, Result<MatchingResult, String>)],
+) -> Result<(), String> {
+    let mut baseline: Option<(&str, f64)> = None;
+    for (name, result) in results {
+        let result = result
+            .as_ref()
+            .map_err(|error| format!("{name} failed to solve: {error}"))?;
         result
             .validate(graph)
-            .unwrap_or_else(|error| panic!("{name} returned an invalid result: {error}"));
-        assert!(
-            result.is_perfect,
-            "{name} did not return a perfect matching"
-        );
+            .map_err(|error| format!("{name} returned an invalid matching: {error}"))?;
+        if !result.is_perfect {
+            return Err(format!("{name} did not return a perfect matching"));
+        }
+        let Some((baseline_name, baseline_weight)) = baseline else {
+            baseline = Some((name, result.total_weight));
+            continue;
+        };
         let tolerance = 1e-9
-            * baseline
-                .total_weight
+            * baseline_weight
                 .abs()
                 .max(result.total_weight.abs())
                 .max(1.0);
-        assert!(
-            (result.total_weight - baseline.total_weight).abs() <= tolerance,
-            "{name} returned weight {}, but {baseline_name} returned {}",
-            result.total_weight,
-            baseline.total_weight
-        );
+        if (result.total_weight - baseline_weight).abs() > tolerance {
+            return Err(format!(
+                "{name} returned weight {}, but {baseline_name} returned {baseline_weight}",
+                result.total_weight
+            ));
+        }
     }
+    if baseline.is_none() {
+        return Err("weighted comparison must include at least one solver".to_string());
+    }
+    Ok(())
 }
 
-fn assert_general_weighted_solvers_agree(graph: &Graph) {
-    assert_weighted_results_agree(
+fn preflight_general_weighted_solvers(graph: &Graph) -> Result<(), String> {
+    check_weighted_results(
         graph,
         &[
             (
                 "primal-dual",
-                blossom_study::algorithms::minimum_weight_perfect_matching(graph)
-                    .expect("generated graph should have a perfect matching"),
+                blossom_study::algorithms::minimum_weight_perfect_matching(graph),
             ),
             (
                 "blossom-engine",
-                blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(graph)
-                    .expect("generated graph should have a perfect matching"),
+                blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(graph),
             ),
             (
                 "blossom-tree",
-                blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph)
-                    .expect("generated graph should have a perfect matching"),
+                blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
             ),
             (
                 "cherry-tree",
-                blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph)
-                    .expect("generated graph should have a perfect matching"),
+                blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph),
             ),
             (
                 "sparse-blossom",
-                blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph)
-                    .expect("generated graph should have a perfect matching"),
+                blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph),
             ),
         ],
-    );
+    )
+}
+
+fn report_failed_preflight(family: &str, parameter: &str, error: String) {
+    eprintln!("[benchmark correctness failure] {family}, {parameter}: {error}; timings skipped");
 }
 
 fn weighted_benchmarks_dense(c: &mut Criterion) {
     let mut group = c.benchmark_group("minimum-weight-perfect/general-dense");
     for n in [20, 50, 100, 200] {
         let graph = generator::complete_graph(n, (1.0, 100.0));
-        assert_general_weighted_solvers_agree(&graph);
+        if let Err(error) = preflight_general_weighted_solvers(&graph) {
+            report_failed_preflight(
+                "minimum-weight-perfect/general-dense",
+                &format!("n={n}"),
+                error,
+            );
+            continue;
+        }
         group.bench_with_input(BenchmarkId::new("primal-dual", n), &graph, |b, graph| {
-            b.iter(|| blossom_study::algorithms::minimum_weight_perfect_matching(graph));
+            b.iter(|| {
+                require_timed_result(blossom_study::algorithms::minimum_weight_perfect_matching(
+                    graph,
+                ))
+            });
         });
         group.bench_with_input(BenchmarkId::new("blossom-engine", n), &graph, |b, graph| {
             b.iter(|| {
-                blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(graph)
+                require_timed_result(
+                    blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(
+                        graph,
+                    ),
+                )
             });
         });
         group.bench_with_input(BenchmarkId::new("blossom-tree", n), &graph, |b, graph| {
             b.iter(|| {
-                blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph)
+                require_timed_result(
+                    blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
+                )
             });
         });
         group.bench_with_input(BenchmarkId::new("cherry-tree", n), &graph, |b, graph| {
             b.iter(|| {
-                blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph)
+                require_timed_result(
+                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph),
+                )
             });
         });
         group.bench_with_input(BenchmarkId::new("sparse-blossom", n), &graph, |b, graph| {
-            b.iter(|| blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph));
+            b.iter(|| {
+                require_timed_result(
+                    blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph),
+                )
+            });
         });
     }
     group.finish();
@@ -226,27 +306,50 @@ fn weighted_benchmarks_sparse(c: &mut Criterion) {
             }
         }
         let graph = Graph::from_edges(n, edges);
-        assert_general_weighted_solvers_agree(&graph);
+        if let Err(error) = preflight_general_weighted_solvers(&graph) {
+            report_failed_preflight(
+                "minimum-weight-perfect/general-sparse",
+                &format!("n={n}"),
+                error,
+            );
+            continue;
+        }
         group.bench_with_input(BenchmarkId::new("primal-dual", n), &graph, |b, graph| {
-            b.iter(|| blossom_study::algorithms::minimum_weight_perfect_matching(graph));
+            b.iter(|| {
+                require_timed_result(blossom_study::algorithms::minimum_weight_perfect_matching(
+                    graph,
+                ))
+            });
         });
         group.bench_with_input(BenchmarkId::new("blossom-engine", n), &graph, |b, graph| {
             b.iter(|| {
-                blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(graph)
+                require_timed_result(
+                    blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(
+                        graph,
+                    ),
+                )
             });
         });
         group.bench_with_input(BenchmarkId::new("blossom-tree", n), &graph, |b, graph| {
             b.iter(|| {
-                blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph)
+                require_timed_result(
+                    blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
+                )
             });
         });
         group.bench_with_input(BenchmarkId::new("cherry-tree", n), &graph, |b, graph| {
             b.iter(|| {
-                blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph)
+                require_timed_result(
+                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph),
+                )
             });
         });
         group.bench_with_input(BenchmarkId::new("sparse-blossom", n), &graph, |b, graph| {
-            b.iter(|| blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph));
+            b.iter(|| {
+                require_timed_result(
+                    blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph),
+                )
+            });
         });
     }
     group.finish();
@@ -320,25 +423,58 @@ fn cardinality_benchmarks_bipartite(c: &mut Criterion) {
             // Keep correctness checks outside the timed closures. Both
             // algorithms must solve the same cardinality instance before a
             // speed comparison is meaningful.
-            let hopcroft_karp = hopcroft_karp_maximum_cardinality_matching(&graph, partition_size)
-                .expect("generated graph must respect its bipartition");
+            let hopcroft_karp =
+                match hopcroft_karp_maximum_cardinality_matching(&graph, partition_size) {
+                    Ok(result) => result,
+                    Err(error) => {
+                        report_failed_preflight(
+                            &format!("maximum-cardinality/bipartite-{shape}"),
+                            &format!("partition_size={partition_size}"),
+                            format!("Hopcroft–Karp failed to solve: {error}"),
+                        );
+                        continue;
+                    }
+                };
             let fast_blossom = FastBlossomMatching::max_cardinality_matching(&graph);
-            hopcroft_karp
+            let preflight = hopcroft_karp
                 .validate(&graph)
-                .expect("Hopcroft–Karp must return a valid matching");
-            fast_blossom
-                .validate(&graph)
-                .expect("Fast Blossom must return a valid matching");
-            assert_eq!(hopcroft_karp.edges.len(), fast_blossom.edges.len());
-            assert_eq!(hopcroft_karp.edges.len(), partition_size);
+                .map_err(|error| format!("Hopcroft–Karp returned an invalid matching: {error}"))
+                .and_then(|()| {
+                    fast_blossom.validate(&graph).map_err(|error| {
+                        format!("Fast Blossom returned an invalid matching: {error}")
+                    })
+                })
+                .and_then(|()| {
+                    if hopcroft_karp.edges.len() == fast_blossom.edges.len()
+                        && hopcroft_karp.edges.len() == partition_size
+                    {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "cardinalities disagree: Hopcroft–Karp={}, Fast Blossom={}, expected={partition_size}",
+                            hopcroft_karp.edges.len(),
+                            fast_blossom.edges.len()
+                        ))
+                    }
+                });
+            if let Err(error) = preflight {
+                report_failed_preflight(
+                    &format!("maximum-cardinality/bipartite-{shape}"),
+                    &format!("partition_size={partition_size}"),
+                    error,
+                );
+                continue;
+            }
             let parameter = format!("{partition_size}+{partition_size}");
             group.bench_with_input(
                 BenchmarkId::new("hopcroft-karp", &parameter),
                 &graph,
                 |b, graph| {
                     b.iter(|| {
-                        hopcroft_karp_maximum_cardinality_matching(graph, partition_size)
-                            .expect("generated graph must respect its bipartition")
+                        require_timed_result(hopcroft_karp_maximum_cardinality_matching(
+                            graph,
+                            partition_size,
+                        ))
                     });
                 },
             );
@@ -359,7 +495,7 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
     for partition_size in [10, 25, 50, 100] {
         let graph = complete_bipartite_graph(partition_size);
         let parameter = format!("{partition_size}+{partition_size}");
-        assert_weighted_results_agree(
+        if let Err(error) = check_weighted_results(
             &graph,
             &[
                 (
@@ -367,47 +503,50 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
                     blossom_study::algorithms::hungarian_minimum_weight_perfect_matching(
                         &graph,
                         partition_size,
-                    )
-                    .expect("complete bipartite graph has a perfect assignment"),
+                    ),
                 ),
                 (
                     "primal-dual",
-                    blossom_study::algorithms::minimum_weight_perfect_matching(&graph)
-                        .expect("complete bipartite graph has a perfect matching"),
+                    blossom_study::algorithms::minimum_weight_perfect_matching(&graph),
                 ),
                 (
                     "blossom-engine",
                     blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(
                         &graph,
-                    )
-                    .expect("complete bipartite graph has a perfect matching"),
+                    ),
                 ),
                 (
                     "blossom-tree",
-                    blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(&graph)
-                        .expect("complete bipartite graph has a perfect matching"),
+                    blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(&graph),
                 ),
                 (
                     "cherry-tree",
-                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(&graph)
-                        .expect("complete bipartite graph has a perfect matching"),
+                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(&graph),
                 ),
                 (
                     "sparse-blossom",
-                    blossom_study::algorithms::sparse_minimum_weight_perfect_matching(&graph)
-                        .expect("complete bipartite graph has a perfect matching"),
+                    blossom_study::algorithms::sparse_minimum_weight_perfect_matching(&graph),
                 ),
             ],
-        );
+        ) {
+            report_failed_preflight(
+                "minimum-weight-perfect/bipartite-dense",
+                &format!("partition_size={partition_size}"),
+                error,
+            );
+            continue;
+        }
 
         group.bench_with_input(
             BenchmarkId::new("hungarian", &parameter),
             &graph,
             |b, graph| {
                 b.iter(|| {
-                    blossom_study::algorithms::hungarian_minimum_weight_perfect_matching(
-                        graph,
-                        partition_size,
+                    require_timed_result(
+                        blossom_study::algorithms::hungarian_minimum_weight_perfect_matching(
+                            graph,
+                            partition_size,
+                        ),
                     )
                 });
             },
@@ -416,7 +555,11 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
             BenchmarkId::new("primal-dual", &parameter),
             &graph,
             |b, graph| {
-                b.iter(|| blossom_study::algorithms::minimum_weight_perfect_matching(graph));
+                b.iter(|| {
+                    require_timed_result(
+                        blossom_study::algorithms::minimum_weight_perfect_matching(graph),
+                    )
+                });
             },
         );
         group.bench_with_input(
@@ -424,7 +567,11 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
             &graph,
             |b, graph| {
                 b.iter(|| {
-                    blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(graph)
+                    require_timed_result(
+                        blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(
+                            graph,
+                        ),
+                    )
                 });
             },
         );
@@ -433,7 +580,11 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
             &graph,
             |b, graph| {
                 b.iter(|| {
-                    blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph)
+                    require_timed_result(
+                        blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(
+                            graph,
+                        ),
+                    )
                 });
             },
         );
@@ -442,7 +593,11 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
             &graph,
             |b, graph| {
                 b.iter(|| {
-                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph)
+                    require_timed_result(
+                        blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(
+                            graph,
+                        ),
+                    )
                 });
             },
         );
@@ -450,7 +605,11 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
             BenchmarkId::new("sparse-blossom", &parameter),
             &graph,
             |b, graph| {
-                b.iter(|| blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph));
+                b.iter(|| {
+                    require_timed_result(
+                        blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph),
+                    )
+                });
             },
         );
     }
