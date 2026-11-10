@@ -1,18 +1,46 @@
 use blossom_study::{
+    MatchingResult,
     algorithms::{FastBlossomMatching, MicaliVazirani, hopcroft_karp_maximum_cardinality_matching},
+    benchmark::{GENERAL_CARDINALITY_SOLVERS, compare_general_cardinality},
     graph::{Edge, Graph, generator},
 };
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
-fn cardinality_benchmarks(c: &mut Criterion) {
-    let mut group = c.benchmark_group("maximum-cardinality/general");
-    for n in [20, 50, 100] {
-        let graph = generator::complete_graph(n, (1.0, 100.0));
-        group.bench_with_input(BenchmarkId::new("fast-blossom", n), &graph, |b, graph| {
-            b.iter(|| FastBlossomMatching::max_cardinality_matching(graph));
-        });
+fn sparse_general_cardinality_graph(n: usize) -> Graph {
+    let mut edges = Vec::with_capacity(4 * n);
+    for u in (0..n).step_by(2) {
+        edges.push(Edge::new(u, u + 1, None));
     }
-    group.finish();
+    for u in 0..n {
+        for offset in [2, 3, 5] {
+            let v = (u + offset) % n;
+            if u < v {
+                edges.push(Edge::new(u, v, None));
+            }
+        }
+    }
+    Graph::from_edges(n, edges)
+}
+
+fn cardinality_benchmarks(c: &mut Criterion) {
+    for (shape, sizes) in [("dense", [20, 50, 100]), ("sparse", [20, 50, 100])] {
+        let mut group = c.benchmark_group(format!("maximum-cardinality/general-{shape}"));
+        for n in sizes {
+            let graph = if shape == "dense" {
+                generator::complete_graph(n, (1.0, 100.0))
+            } else {
+                sparse_general_cardinality_graph(n)
+            };
+            compare_general_cardinality(&graph)
+                .unwrap_or_else(|error| panic!("cardinality precheck failed for n={n}: {error}"));
+            for solver in GENERAL_CARDINALITY_SOLVERS {
+                group.bench_with_input(BenchmarkId::new(solver.name, n), &graph, |b, graph| {
+                    b.iter(|| (solver.solve)(graph))
+                });
+            }
+        }
+        group.finish();
+    }
 
     // MV is not placed beside completed solvers yet.  This group measures the
     // implemented alternating parity-level search only; its name prevents the
@@ -81,10 +109,79 @@ fn cardinality_benchmarks(c: &mut Criterion) {
     development.finish();
 }
 
+fn assert_weighted_results_agree(graph: &Graph, results: &[(&str, MatchingResult)]) {
+    let Some((baseline_name, baseline)) = results.first() else {
+        panic!("weighted comparison must include a solver");
+    };
+    baseline
+        .validate(graph)
+        .unwrap_or_else(|error| panic!("{baseline_name} returned an invalid result: {error}"));
+    assert!(
+        baseline.is_perfect,
+        "{baseline_name} did not return a perfect matching"
+    );
+
+    for (name, result) in &results[1..] {
+        result
+            .validate(graph)
+            .unwrap_or_else(|error| panic!("{name} returned an invalid result: {error}"));
+        assert!(
+            result.is_perfect,
+            "{name} did not return a perfect matching"
+        );
+        let tolerance = 1e-9
+            * baseline
+                .total_weight
+                .abs()
+                .max(result.total_weight.abs())
+                .max(1.0);
+        assert!(
+            (result.total_weight - baseline.total_weight).abs() <= tolerance,
+            "{name} returned weight {}, but {baseline_name} returned {}",
+            result.total_weight,
+            baseline.total_weight
+        );
+    }
+}
+
+fn assert_general_weighted_solvers_agree(graph: &Graph) {
+    assert_weighted_results_agree(
+        graph,
+        &[
+            (
+                "primal-dual",
+                blossom_study::algorithms::minimum_weight_perfect_matching(graph)
+                    .expect("generated graph should have a perfect matching"),
+            ),
+            (
+                "blossom-engine",
+                blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(graph)
+                    .expect("generated graph should have a perfect matching"),
+            ),
+            (
+                "blossom-tree",
+                blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph)
+                    .expect("generated graph should have a perfect matching"),
+            ),
+            (
+                "cherry-tree",
+                blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph)
+                    .expect("generated graph should have a perfect matching"),
+            ),
+            (
+                "sparse-blossom",
+                blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph)
+                    .expect("generated graph should have a perfect matching"),
+            ),
+        ],
+    );
+}
+
 fn weighted_benchmarks_dense(c: &mut Criterion) {
     let mut group = c.benchmark_group("minimum-weight-perfect/general-dense");
     for n in [20, 50, 100, 200] {
         let graph = generator::complete_graph(n, (1.0, 100.0));
+        assert_general_weighted_solvers_agree(&graph);
         group.bench_with_input(BenchmarkId::new("primal-dual", n), &graph, |b, graph| {
             b.iter(|| blossom_study::algorithms::minimum_weight_perfect_matching(graph));
         });
@@ -129,6 +226,7 @@ fn weighted_benchmarks_sparse(c: &mut Criterion) {
             }
         }
         let graph = Graph::from_edges(n, edges);
+        assert_general_weighted_solvers_agree(&graph);
         group.bench_with_input(BenchmarkId::new("primal-dual", n), &graph, |b, graph| {
             b.iter(|| blossom_study::algorithms::minimum_weight_perfect_matching(graph));
         });
@@ -225,6 +323,12 @@ fn cardinality_benchmarks_bipartite(c: &mut Criterion) {
             let hopcroft_karp = hopcroft_karp_maximum_cardinality_matching(&graph, partition_size)
                 .expect("generated graph must respect its bipartition");
             let fast_blossom = FastBlossomMatching::max_cardinality_matching(&graph);
+            hopcroft_karp
+                .validate(&graph)
+                .expect("Hopcroft–Karp must return a valid matching");
+            fast_blossom
+                .validate(&graph)
+                .expect("Fast Blossom must return a valid matching");
             assert_eq!(hopcroft_karp.edges.len(), fast_blossom.edges.len());
             assert_eq!(hopcroft_karp.edges.len(), partition_size);
             let parameter = format!("{partition_size}+{partition_size}");
@@ -255,6 +359,46 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
     for partition_size in [10, 25, 50, 100] {
         let graph = complete_bipartite_graph(partition_size);
         let parameter = format!("{partition_size}+{partition_size}");
+        assert_weighted_results_agree(
+            &graph,
+            &[
+                (
+                    "hungarian",
+                    blossom_study::algorithms::hungarian_minimum_weight_perfect_matching(
+                        &graph,
+                        partition_size,
+                    )
+                    .expect("complete bipartite graph has a perfect assignment"),
+                ),
+                (
+                    "primal-dual",
+                    blossom_study::algorithms::minimum_weight_perfect_matching(&graph)
+                        .expect("complete bipartite graph has a perfect matching"),
+                ),
+                (
+                    "blossom-engine",
+                    blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(
+                        &graph,
+                    )
+                    .expect("complete bipartite graph has a perfect matching"),
+                ),
+                (
+                    "blossom-tree",
+                    blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(&graph)
+                        .expect("complete bipartite graph has a perfect matching"),
+                ),
+                (
+                    "cherry-tree",
+                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(&graph)
+                        .expect("complete bipartite graph has a perfect matching"),
+                ),
+                (
+                    "sparse-blossom",
+                    blossom_study::algorithms::sparse_minimum_weight_perfect_matching(&graph)
+                        .expect("complete bipartite graph has a perfect matching"),
+                ),
+            ],
+        );
 
         group.bench_with_input(
             BenchmarkId::new("hungarian", &parameter),

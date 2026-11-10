@@ -128,3 +128,57 @@ fn generic_benchmark_runner_excludes_experimental_mv() {
     std::fs::remove_file(config_path).unwrap();
     std::fs::remove_dir(temp_root).unwrap();
 }
+
+#[test]
+fn generic_benchmark_runner_labels_and_checks_cardinality_solvers() {
+    let temp_root =
+        std::env::temp_dir().join(format!("blossom-study-comparison-{}", std::process::id()));
+    std::fs::create_dir(&temp_root).expect("temporary benchmark directory should be created");
+    let config_path = temp_root.join("config.json");
+    let output_path = temp_root.join("results");
+    std::fs::write(
+        &config_path,
+        r#"{
+            "graph_sizes": [6],
+            "densities": [1.0],
+            "weight_ranges": [[1.0, 2.0]],
+            "runs_per_config": 1,
+            "algorithms": ["fast_blossom", "gabow", "primal-dual"]
+        }"#,
+    )
+    .expect("benchmark config should be written");
+
+    let output = run(&[
+        "bench",
+        "--config",
+        config_path.to_str().expect("UTF-8 config path"),
+        "--output",
+        output_path.to_str().expect("UTF-8 output path"),
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("maximum-cardinality"));
+    assert!(stdout.contains("fast-blossom"));
+    assert!(stdout.contains("gabow-heuristic"));
+    assert!(stdout.contains("minimum-weight-perfect"));
+
+    let records: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(output_path.join("bench_results.json"))
+            .expect("benchmark results should exist"),
+    )
+    .expect("benchmark results should be valid JSON");
+    assert_eq!(records.as_array().unwrap().len(), 3);
+    assert_eq!(records[0]["problem"], "maximum-cardinality");
+    assert_eq!(records[0]["algorithm"], "fast-blossom");
+    assert_eq!(records[1]["algorithm"], "gabow-heuristic");
+    assert_eq!(records[2]["problem"], "minimum-weight-perfect");
+
+    std::fs::remove_file(output_path.join("bench_results.json")).unwrap();
+    std::fs::remove_dir(&output_path).unwrap();
+    std::fs::remove_file(config_path).unwrap();
+    std::fs::remove_dir(temp_root).unwrap();
+}

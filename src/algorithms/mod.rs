@@ -142,6 +142,7 @@ mod blossom_tree_flat;
 pub mod cherry_tree_solver;
 pub mod fast_blossom;
 pub mod gabow_heuristic;
+pub mod general_cardinality;
 pub mod hopcroft_karp;
 pub mod hungarian;
 mod korte_vygen;

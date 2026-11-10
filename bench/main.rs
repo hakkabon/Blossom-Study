@@ -1,7 +1,7 @@
 //! Benchmark runner for completed matching algorithms.
 
 use blossom_study::{
-    FastBlossomMatching,
+    benchmark::compare_general_cardinality,
     graph::{Edge, Graph, generator},
 };
 
@@ -19,8 +19,10 @@ fn complete_bipartite_graph(partition_size: usize) -> Graph {
 fn main() {
     println!("Blossom Algorithm Benchmark");
     println!("===========================\n");
-    println!("GENERAL-GRAPH CARDINALITY AND MWPM");
-    println!("Experimental phased cardinality tracks are excluded.");
+    println!("GENERAL-GRAPH MAXIMUM CARDINALITY");
+    println!(
+        "Every registered solver receives the same graph; cardinality agreement is checked first."
+    );
 
     let test_cases = vec![
         ("K6 (complete)", generator::complete_graph(6, (1.0, 100.0))),
@@ -40,19 +42,24 @@ fn main() {
     ];
 
     println!(
-        "{:<20} | {:>8} | {:>8} | {:>10} | {:>8}",
-        "Graph", "Vertices", "Edges", "Cardinality", "Time(ms)"
+        "{:<20} | {:>8} | {:>8} | {:>10} | {:>8} | {:<18} | {}",
+        "Graph", "Vertices", "Edges", "Cardinality", "Time(ms)", "Solver", "Role"
     );
     for (name, graph) in &test_cases {
-        let result = FastBlossomMatching::max_cardinality_matching(graph);
-        println!(
-            "{:<20} | {:>8} | {:>8} | {:>10} | {:>8.2}",
-            name,
-            graph.n,
-            graph.edges.len(),
-            result.edges.len(),
-            result.metadata.runtime_ms
-        );
+        let comparisons = compare_general_cardinality(graph)
+            .unwrap_or_else(|error| panic!("cardinality comparison failed for {name}: {error}"));
+        for comparison in comparisons {
+            println!(
+                "{:<20} | {:>8} | {:>8} | {:>10} | {:>8.2} | {:<18} | {}",
+                name,
+                graph.n,
+                graph.edges.len(),
+                comparison.result.edges.len(),
+                comparison.result.metadata.runtime_ms,
+                comparison.solver.name,
+                comparison.solver.role
+            );
+        }
     }
 
     println!("\nGENERAL-GRAPH MINIMUM-WEIGHT PERFECT MATCHING");
@@ -141,6 +148,6 @@ fn main() {
         }
     }
 
-    println!("\nFast Blossom is the general-graph maximum-cardinality baseline.");
-    println!("MV development timing is available only in the isolated Criterion phase group.");
+    println!("\nExperimental Micali–Vazirani is excluded from end-to-end comparisons.");
+    println!("Its development timing is available only in the isolated Criterion phase group.");
 }

@@ -13,6 +13,7 @@ blossom-study/
 │   │   └── mod.rs          # Graph representations and generators
 │   └── algorithms/
 │       ├── mod.rs          # Common types and traits
+│       ├── general_cardinality.rs # Named general-graph cardinality solver registry
 │       ├── gabow_cardinality.rs # Experimental Gabow-inspired cardinality solver
 │       ├── micali_vazirani.rs # Experimental phased Micali–Vazirani track
 │       ├── fast_blossom.rs # Conventional blossom cardinality baseline
@@ -101,12 +102,25 @@ JSON graph deserialization and the fallible graph constructors reject edge endpo
 ### Benchmarks
 
 ```bash
-# Run the complete comparison runner (Cardinality + MWPM + Bipartite)
+# Run the quick CLI comparisons (general cardinality and weighted matching)
 cargo run --bin bench
 
-# Statistically robust Criterion benchmark suite
+# Run statistically sampled Criterion comparisons
 cargo bench --bench matching
 ```
+
+The general-graph cardinality comparisons run `fast-blossom` and the
+`gabow-heuristic` on identical graphs, validate each returned matching, and
+require their cardinalities to agree before displaying timings. This agreement
+is a comparison check, not an optimality proof; the dedicated small-graph
+oracle tests provide independent correctness evidence. The Gabow-inspired
+implementation is labeled as a heuristic and makes no $O(m\sqrt n)$ claim.
+Experimental Micali–Vazirani remains outside end-to-end comparisons; only its
+isolated level-search phase is benchmarked. Bipartite cardinality and weighted
+perfect-matching comparisons remain separate because they measure different
+problems. Criterion performs matching validity checks and requires weighted
+solvers on each generated instance to agree on the reported optimum before it
+starts timing the comparison.
 
 ---
 
