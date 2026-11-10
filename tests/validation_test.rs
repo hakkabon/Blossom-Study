@@ -129,3 +129,27 @@ fn matching_result_validator_rejects_self_loops_and_mutated_graphs() {
     invalid.edges[0].v = 2;
     assert!(result(vec![], 0.0, false).validate(&invalid).is_err());
 }
+
+#[test]
+fn matching_result_validator_rejects_non_finite_selected_weights() {
+    let graph = Graph::from_edges(2, vec![Edge::new(0, 1, Some(f64::NAN))]);
+    assert!(result(vec![0], 0.0, true).validate(&graph).is_err());
+}
+
+#[test]
+fn matching_result_validator_uses_compensated_weight_summation() {
+    let graph = Graph::from_edges(
+        6,
+        vec![
+            Edge::new(0, 1, Some(1.0e16)),
+            Edge::new(2, 3, Some(1.0)),
+            Edge::new(4, 5, Some(-1.0e16)),
+        ],
+    );
+    assert!(result(vec![0, 1, 2], 1.0, true).validate(&graph).is_ok());
+    assert!(
+        result(vec![0, 1, 2], 1000.0, true)
+            .validate(&graph)
+            .is_err()
+    );
+}

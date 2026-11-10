@@ -4,11 +4,14 @@
 //! with the established exact solver.  The Cherry cases cover the defects from
 //! the retired prototypes as well as sparse and nested-blossom searches.
 
+mod common;
+
 use blossom_study::graph::{Edge, Graph};
 use blossom_study::{
     BlossomTreeSolver, CherryTreeSolver, minimum_weight_perfect_matching,
     sparse_minimum_weight_perfect_matching,
 };
+use common::assert_perfect_matching;
 
 fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
     Graph::from_edges(
@@ -18,18 +21,6 @@ fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
             .map(|&(u, v, weight)| Edge::new(u, v, Some(weight)))
             .collect(),
     )
-}
-
-fn assert_perfect(graph: &Graph, result: &blossom_study::MatchingResult) {
-    let mut covered = vec![false; graph.n];
-    for &edge_index in &result.edges {
-        let edge = &graph.edges[edge_index];
-        assert!(!covered[edge.u]);
-        assert!(!covered[edge.v]);
-        covered[edge.u] = true;
-        covered[edge.v] = true;
-    }
-    assert!(covered.into_iter().all(|value| value));
 }
 
 #[test]
@@ -50,7 +41,8 @@ fn blossom_tree_matches_exact_baseline_on_varied_complete_graphs() {
         let graph = graph(n, &edges);
         let expected = minimum_weight_perfect_matching(&graph).unwrap();
         let actual = BlossomTreeSolver::new().solve(&graph).unwrap();
-        assert_perfect(&graph, &actual);
+        assert_perfect_matching(&graph, &expected);
+        assert_perfect_matching(&graph, &actual);
         assert_eq!(actual.total_weight, expected.total_weight, "case {case}");
     }
 }
@@ -73,6 +65,10 @@ fn all_verified_weighted_solvers_agree_on_an_odd_cycle_instance() {
     let flat = BlossomTreeSolver::new().solve(&graph).unwrap();
     let sparse = sparse_minimum_weight_perfect_matching(&graph).unwrap();
     let cherry = CherryTreeSolver::new().solve(&graph).unwrap();
+    assert_perfect_matching(&graph, &baseline);
+    assert_perfect_matching(&graph, &flat);
+    assert_perfect_matching(&graph, &sparse);
+    assert_perfect_matching(&graph, &cherry);
     assert_eq!(flat.total_weight, baseline.total_weight);
     assert_eq!(sparse.total_weight, baseline.total_weight);
     assert_eq!(cherry.total_weight, baseline.total_weight);
@@ -82,7 +78,7 @@ fn all_verified_weighted_solvers_agree_on_an_odd_cycle_instance() {
 fn cherry_tree_accepts_sparse_input() {
     let sparse = graph(4, &[(0, 1, 1.0), (2, 3, 1.0)]);
     let result = CherryTreeSolver::new().solve(&sparse).unwrap();
-    assert_perfect(&sparse, &result);
+    assert_perfect_matching(&sparse, &result);
     assert_eq!(result.total_weight, 2.0);
 }
 
@@ -100,7 +96,7 @@ fn cherry_tree_can_return_a_valid_result_on_a_simple_complete_graph() {
         ],
     );
     let result = CherryTreeSolver::new().solve(&graph).unwrap();
-    assert_perfect(&graph, &result);
+    assert_perfect_matching(&graph, &result);
     assert_eq!(result.total_weight, 2.0);
 }
 
@@ -118,7 +114,7 @@ fn cherry_tree_handles_the_equal_weight_k4_regression() {
         ],
     );
     let result = CherryTreeSolver::new().solve(&graph).unwrap();
-    assert_perfect(&graph, &result);
+    assert_perfect_matching(&graph, &result);
     assert_eq!(result.total_weight, 2.0);
 }
 
@@ -139,7 +135,7 @@ fn cherry_tree_handles_the_unique_k4_regression() {
         ],
     );
     let result = CherryTreeSolver::new().solve(&graph).unwrap();
-    assert_perfect(&graph, &result);
+    assert_perfect_matching(&graph, &result);
     assert_eq!(result.total_weight, 6.0);
 }
 
@@ -159,7 +155,8 @@ fn cherry_tree_matches_exact_baseline_on_complete_graphs() {
             let graph = graph(n, &edges);
             let expected = minimum_weight_perfect_matching(&graph).unwrap();
             let actual = CherryTreeSolver::new().solve(&graph).unwrap();
-            assert_perfect(&graph, &actual);
+            assert_perfect_matching(&graph, &expected);
+            assert_perfect_matching(&graph, &actual);
             assert_eq!(
                 actual.total_weight, expected.total_weight,
                 "n={n}, case={case}"
@@ -185,7 +182,7 @@ fn cherry_tree_does_not_accept_a_greedy_but_suboptimal_perfect_matching() {
         ],
     );
     let result = CherryTreeSolver::new().solve(&graph).unwrap();
-    assert_perfect(&graph, &result);
+    assert_perfect_matching(&graph, &result);
     assert_eq!(result.total_weight, 537.0);
 }
 
@@ -218,7 +215,8 @@ fn cherry_tree_matches_the_oracle_on_random_sparse_graphs_with_planted_matchings
             let graph = graph(n, &edges);
             let expected = minimum_weight_perfect_matching(&graph).unwrap();
             let actual = CherryTreeSolver::new().solve(&graph).unwrap();
-            assert_perfect(&graph, &actual);
+            assert_perfect_matching(&graph, &expected);
+            assert_perfect_matching(&graph, &actual);
             assert_eq!(
                 actual.total_weight, expected.total_weight,
                 "n={n}, case={case}"
@@ -245,7 +243,7 @@ fn cherry_tree_contracts_nested_odd_cycles_and_rejects_infeasible_graphs() {
         ],
     );
     let result = CherryTreeSolver::new().solve(&nested).unwrap();
-    assert_perfect(&nested, &result);
+    assert_perfect_matching(&nested, &result);
     assert_eq!(result.total_weight, 4.0);
     assert!(result.metadata.blossoms_created > 0);
 

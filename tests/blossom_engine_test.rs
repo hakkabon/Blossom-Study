@@ -1,7 +1,10 @@
+mod common;
+
 use blossom_study::algorithms::{
     BlossomEngine, blossom_engine_minimum_weight_perfect_matching, minimum_weight_perfect_matching,
 };
 use blossom_study::graph::{Edge, Graph};
+use common::assert_perfect_matching;
 
 fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
     Graph::from_edges(
@@ -11,18 +14,6 @@ fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
             .map(|&(u, v, weight)| Edge::new(u, v, Some(weight)))
             .collect(),
     )
-}
-
-fn assert_perfect(graph: &Graph, indices: &[usize]) {
-    let mut covered = vec![false; graph.n];
-    for &index in indices {
-        let edge = &graph.edges[index];
-        assert!(!covered[edge.u], "vertex {} appears twice", edge.u);
-        assert!(!covered[edge.v], "vertex {} appears twice", edge.v);
-        covered[edge.u] = true;
-        covered[edge.v] = true;
-    }
-    assert!(covered.into_iter().all(|value| value));
 }
 
 fn brute_force(cost: &[Vec<f64>], mask: u32) -> f64 {
@@ -56,7 +47,7 @@ fn solves_supplied_diamond_case() {
         ],
     );
     let result = BlossomEngine::new().solve(&graph).unwrap();
-    assert_perfect(&graph, &result.edges);
+    assert_perfect_matching(&graph, &result);
     assert_eq!(result.total_weight, 9.0);
 }
 
@@ -73,7 +64,7 @@ fn supports_negative_fractional_and_parallel_edges() {
         ],
     );
     let result = blossom_engine_minimum_weight_perfect_matching(&graph).unwrap();
-    assert_perfect(&graph, &result.edges);
+    assert_perfect_matching(&graph, &result);
     assert_eq!(result.total_weight, -7.75);
     assert!(result.edges.contains(&1));
 }
@@ -102,7 +93,7 @@ fn agrees_with_brute_force_on_dense_random_graphs() {
             let graph = graph(n, &edges);
             let result = blossom_engine_minimum_weight_perfect_matching(&graph)
                 .unwrap_or_else(|error| panic!("n={n}, case={case}, edges={edges:?}: {error}"));
-            assert_perfect(&graph, &result.edges);
+            assert_perfect_matching(&graph, &result);
             let expected = brute_force(&costs, (1_u32 << n) - 1);
             assert_eq!(result.total_weight, expected, "n={n}, case={case}");
         }
@@ -133,7 +124,8 @@ fn agrees_with_existing_solver_on_sparse_planted_instances() {
         let expected = minimum_weight_perfect_matching(&graph).unwrap();
         let actual = blossom_engine_minimum_weight_perfect_matching(&graph)
             .unwrap_or_else(|error| panic!("case={case}: {error}"));
-        assert_perfect(&graph, &actual.edges);
+        assert_perfect_matching(&graph, &expected);
+        assert_perfect_matching(&graph, &actual);
         assert_eq!(actual.total_weight, expected.total_weight, "case={case}");
     }
 }
@@ -181,7 +173,7 @@ fn handles_equal_weights_and_nested_odd_cycles() {
         ],
     );
     let result = blossom_engine_minimum_weight_perfect_matching(&graph).unwrap();
-    assert_perfect(&graph, &result.edges);
+    assert_perfect_matching(&graph, &result);
     assert_eq!(result.total_weight, 4.0);
     assert!(result.metadata.blossoms_created > 0);
 }

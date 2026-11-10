@@ -1,9 +1,12 @@
 //! Correctness tests for the bipartite Hungarian benchmark baseline.
 
+mod common;
+
 use blossom_study::{
     Edge, Graph, HungarianSolver, hungarian_minimum_weight_perfect_matching,
     minimum_weight_perfect_matching,
 };
+use common::assert_perfect_matching;
 
 fn bipartite_graph(costs: &[Vec<Option<f64>>]) -> Graph {
     let size = costs.len();
@@ -19,18 +22,17 @@ fn bipartite_graph(costs: &[Vec<Option<f64>>]) -> Graph {
     Graph::from_edges(2 * size, edges)
 }
 
-fn assert_bipartite_perfect(graph: &Graph, left_size: usize, edges: &[usize]) {
-    assert_eq!(edges.len(), left_size);
-    let mut covered = vec![false; graph.n];
-    for &index in edges {
+fn assert_bipartite_perfect(
+    graph: &Graph,
+    left_size: usize,
+    result: &blossom_study::MatchingResult,
+) {
+    assert_perfect_matching(graph, result);
+    assert_eq!(result.edges.len(), left_size);
+    for &index in &result.edges {
         let edge = &graph.edges[index];
         assert_ne!(edge.u < left_size, edge.v < left_size);
-        assert!(!covered[edge.u]);
-        assert!(!covered[edge.v]);
-        covered[edge.u] = true;
-        covered[edge.v] = true;
     }
-    assert!(covered.into_iter().all(|value| value));
 }
 
 #[test]
@@ -41,7 +43,7 @@ fn solves_the_classic_three_by_three_assignment() {
         vec![Some(3.0), Some(2.0), Some(2.0)],
     ]);
     let result = HungarianSolver::new(3).solve(&graph).unwrap();
-    assert_bipartite_perfect(&graph, 3, &result.edges);
+    assert_bipartite_perfect(&graph, 3, &result);
     assert_eq!(result.total_weight, 5.0);
     assert_eq!(result.metadata.blossoms_created, 0);
     assert_eq!(result.metadata.augmentations, 3);
@@ -59,7 +61,7 @@ fn supports_sparse_negative_fractional_and_parallel_edges() {
     graph = Graph::from_edges(graph.n, graph.edges);
 
     let result = hungarian_minimum_weight_perfect_matching(&graph, 3).unwrap();
-    assert_bipartite_perfect(&graph, 3, &result.edges);
+    assert_bipartite_perfect(&graph, 3, &result);
     assert_eq!(result.total_weight, 4.5);
 }
 
@@ -93,7 +95,7 @@ fn sparse_frontier_keeps_slack_discovered_by_an_earlier_tree_row() {
     // so the solver must retain row 1's earlier slack across the tree growth.
     let graph = bipartite_graph(&[vec![Some(0.0), None], vec![Some(0.0), Some(5.0)]]);
     let result = HungarianSolver::new(2).solve(&graph).unwrap();
-    assert_bipartite_perfect(&graph, 2, &result.edges);
+    assert_bipartite_perfect(&graph, 2, &result);
     assert_eq!(result.total_weight, 5.0);
 }
 
@@ -116,7 +118,8 @@ fn agrees_with_the_general_graph_solver_on_random_assignments() {
             let actual = HungarianSolver::new(size)
                 .solve(&graph)
                 .unwrap_or_else(|error| panic!("size={size}, case={case}: {error}"));
-            assert_bipartite_perfect(&graph, size, &actual.edges);
+            assert_bipartite_perfect(&graph, size, &actual);
+            assert_perfect_matching(&graph, &expected);
             assert_eq!(actual.total_weight, expected.total_weight, "case={case}");
         }
     }

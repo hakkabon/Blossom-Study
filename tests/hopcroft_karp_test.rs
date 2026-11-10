@@ -1,16 +1,19 @@
 //! Independent correctness checks for the bipartite cardinality baseline.
 
-use blossom_study::{Edge, Graph, HopcroftKarpSolver, hopcroft_karp_maximum_cardinality_matching};
+mod common;
 
-fn assert_valid_matching(graph: &Graph, left_size: usize, indices: &[usize]) {
-    let mut covered = vec![false; graph.n];
-    for &index in indices {
+use blossom_study::{Edge, Graph, HopcroftKarpSolver, hopcroft_karp_maximum_cardinality_matching};
+use common::assert_valid_matching;
+
+fn assert_bipartite_matching(
+    graph: &Graph,
+    left_size: usize,
+    result: &blossom_study::MatchingResult,
+) {
+    assert_valid_matching(graph, result);
+    for &index in &result.edges {
         let edge = &graph.edges[index];
         assert_ne!(edge.u < left_size, edge.v < left_size);
-        assert!(!covered[edge.u], "left or right endpoint used twice");
-        assert!(!covered[edge.v], "left or right endpoint used twice");
-        covered[edge.u] = true;
-        covered[edge.v] = true;
     }
 }
 
@@ -28,7 +31,7 @@ fn finds_an_augmenting_path_in_a_later_bfs_phase() {
         ],
     );
     let result = HopcroftKarpSolver::new(2).solve(&graph).unwrap();
-    assert_valid_matching(&graph, 2, &result.edges);
+    assert_bipartite_matching(&graph, 2, &result);
     assert_eq!(result.edges, vec![1, 2]);
     assert_eq!(result.metadata.augmentations, 2);
     assert_eq!(result.total_weight, 2.0);
@@ -46,17 +49,19 @@ fn handles_unbalanced_and_nonperfect_bipartite_graphs() {
         ],
     );
     let result = hopcroft_karp_maximum_cardinality_matching(&graph, 3).unwrap();
-    assert_valid_matching(&graph, 3, &result.edges);
+    assert_bipartite_matching(&graph, 3, &result);
     assert_eq!(result.edges.len(), 2);
     assert!(!result.is_perfect);
 
     let empty = Graph::from_edges(0, vec![]);
     let result = HopcroftKarpSolver::new(0).solve(&empty).unwrap();
+    assert_valid_matching(&empty, &result);
     assert!(result.edges.is_empty());
     assert!(result.is_perfect);
 
     let isolated = Graph::from_edges(3, vec![]);
     let result = HopcroftKarpSolver::new(1).solve(&isolated).unwrap();
+    assert_valid_matching(&isolated, &result);
     assert!(result.edges.is_empty());
     assert!(!result.is_perfect);
 }
@@ -68,6 +73,7 @@ fn ignores_costs_for_selection_and_preserves_original_parallel_edge_index() {
         vec![Edge::new(1, 0, Some(100.0)), Edge::new(0, 1, Some(-50.0))],
     );
     let result = HopcroftKarpSolver::new(1).solve(&graph).unwrap();
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges, vec![0]);
     assert_eq!(result.total_weight, 100.0);
     assert!(result.is_perfect);
@@ -119,7 +125,7 @@ fn agrees_with_an_exhaustive_oracle_on_all_small_bipartite_graphs() {
                 let result = HopcroftKarpSolver::new(left_size)
                     .solve(&graph)
                     .unwrap_or_else(|error| panic!("mask={edge_mask}: {error}"));
-                assert_valid_matching(&graph, left_size, &result.edges);
+                assert_bipartite_matching(&graph, left_size, &result);
                 assert_eq!(
                     result.edges.len(),
                     brute_force_cardinality(&neighbors, 0, 0),

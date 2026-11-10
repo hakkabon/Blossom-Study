@@ -1,6 +1,9 @@
+mod common;
+
 use blossom_study::{
     DdfsResult, Edge, Graph, MicaliVazirani, MicaliVaziraniError, MicaliVaziraniPhase,
 };
+use common::assert_valid_matching;
 
 #[test]
 fn bridge_processing_milestone_exposes_augmentation_phase() {
@@ -31,6 +34,7 @@ fn bridge_processing_milestone_exposes_augmentation_phase() {
     // Full algorithm execution: finds maximum matching of size 2
     let mut solver2 = MicaliVazirani::new(&graph);
     let result = solver2.max_cardinality_matching(&graph).unwrap();
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges.len(), 2);
     assert!(result.is_perfect);
     assert_eq!(solver2.phase(), MicaliVaziraniPhase::Finished);
@@ -413,6 +417,7 @@ fn mv_solves_pentagon_with_tail() {
     );
     let mut solver = MicaliVazirani::new(&graph);
     let result = solver.max_cardinality_matching(&graph).unwrap();
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges.len(), 3);
     assert!(result.is_perfect);
 }
@@ -436,6 +441,7 @@ fn mv_solves_nested_blossoms() {
     );
     let mut solver = MicaliVazirani::new(&graph);
     let result = solver.max_cardinality_matching(&graph).unwrap();
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges.len(), 4);
     assert!(result.is_perfect);
 }
@@ -459,6 +465,8 @@ fn mv_matches_fast_blossom_on_complete_and_odd_graphs() {
     let mut mv_k4 = MicaliVazirani::new(&k4);
     let res_mv_k4 = mv_k4.max_cardinality_matching(&k4).unwrap();
     let res_fb_k4 = FastBlossomMatching::max_cardinality_matching(&k4);
+    assert_valid_matching(&k4, &res_mv_k4);
+    assert_valid_matching(&k4, &res_fb_k4);
     assert_eq!(res_mv_k4.edges.len(), res_fb_k4.edges.len());
     assert_eq!(res_mv_k4.edges.len(), 2);
 
@@ -478,6 +486,8 @@ fn mv_matches_fast_blossom_on_complete_and_odd_graphs() {
     let mut mv_c7 = MicaliVazirani::new(&c7);
     let res_mv_c7 = mv_c7.max_cardinality_matching(&c7).unwrap();
     let res_fb_c7 = FastBlossomMatching::max_cardinality_matching(&c7);
+    assert_valid_matching(&c7, &res_mv_c7);
+    assert_valid_matching(&c7, &res_fb_c7);
     assert_eq!(res_mv_c7.edges.len(), res_fb_c7.edges.len());
     assert_eq!(res_mv_c7.edges.len(), 3);
 }
@@ -511,6 +521,7 @@ fn mv_agrees_with_fast_blossom_on_varied_graphs() {
 
             let mut mv = MicaliVazirani::new(&graph);
             let mv_result = mv.max_cardinality_matching(&graph).unwrap();
+            assert_valid_matching(&graph, &mv_result);
             assert_eq!(
                 mv_result.edges.len(),
                 expected_cardinality,
@@ -556,6 +567,7 @@ fn matched_bridge_on_four_vertex_path_is_not_a_false_optimum() {
 
     let mut from_empty = MicaliVazirani::new(&graph);
     let result = from_empty.max_cardinality_matching(&graph).unwrap();
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges.len(), 2);
     assert!(result.is_perfect);
 }
@@ -597,6 +609,7 @@ fn nested_petals_are_unrolled_to_an_actual_augmenting_path() {
     ];
     let mut solver = MicaliVazirani::with_matching(&graph, initial).unwrap();
     let result = solver.max_cardinality_matching(&graph).unwrap();
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges.len(), 4);
     assert!(result.is_perfect);
 }
@@ -639,6 +652,7 @@ fn nested_petal_length_nine_augmenting_path_succeeds() {
     ];
     let mut solver = MicaliVazirani::with_matching(&graph, initial).unwrap();
     let result = solver.max_cardinality_matching(&graph).unwrap();
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges.len(), 5);
     assert!(result.is_perfect);
 }
@@ -671,9 +685,9 @@ fn mv_solves_second_ten_vertex_nested_petal_regression() {
     let mut solver = MicaliVazirani::new(&graph);
     let result = solver.max_cardinality_matching(&graph);
     let result = result.expect("nested-petal regression should be solved");
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges.len(), 5);
     assert!(result.is_perfect);
-    result.validate(&graph).unwrap();
 }
 
 /// Exact, deliberately exponential oracle for the tiny exhaustive suite.
@@ -721,6 +735,7 @@ fn mv_agrees_with_exhaustive_small_graph_oracle() {
             let expected = brute_maximum_cardinality(n, &chosen, 0);
             let mut solver = MicaliVazirani::new(&graph);
             let result = solver.max_cardinality_matching(&graph).unwrap();
+            assert_valid_matching(&graph, &result);
             assert_eq!(
                 result.edges.len(),
                 expected,

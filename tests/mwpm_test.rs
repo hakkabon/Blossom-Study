@@ -1,6 +1,9 @@
+mod common;
+
 use blossom_study::algorithms::minimum_weight_perfect_matching;
 use blossom_study::algorithms::mwpm::{WeightScaler, filter_edges};
 use blossom_study::graph::{Edge, Graph};
+use common::assert_perfect_matching;
 
 fn make_graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
     Graph::from_edges(
@@ -102,6 +105,7 @@ fn test_weighted_solver_public_entry_point() {
     );
 
     let result = minimum_weight_perfect_matching(&graph).expect("MWPM should succeed");
+    assert_perfect_matching(&graph, &result);
     assert_eq!(result.edges.len(), 2);
     assert!(result.is_perfect);
     assert_eq!(result.total_weight, 3.0);

@@ -57,6 +57,8 @@ impl MatchingResult {
 
         let mut covered = vec![false; graph.n];
         let mut expected_weight = 0.0;
+        let mut compensation = 0.0;
+        let mut absolute_weight_sum = 0.0;
         for &edge_index in &self.edges {
             let edge = graph.edges.get(edge_index).ok_or_else(|| {
                 format!(
@@ -74,16 +76,37 @@ impl MatchingResult {
             }
             covered[edge.u] = true;
             covered[edge.v] = true;
-            expected_weight += edge.weight_or_one();
+            let weight = edge.weight_or_one();
+            if !weight.is_finite() {
+                return Err(format!("matching edge {edge_index} has non-finite weight"));
+            }
+            absolute_weight_sum += weight.abs();
+
+            let next_sum = expected_weight + weight;
+            if expected_weight.abs() >= weight.abs() {
+                compensation += (expected_weight - next_sum) + weight;
+            } else {
+                compensation += (weight - next_sum) + expected_weight;
+            }
+            expected_weight = next_sum;
         }
+        expected_weight += compensation;
 
         if !self.total_weight.is_finite() || !expected_weight.is_finite() {
             return Err("matching or reported total weight is not finite".to_string());
         }
+        if !absolute_weight_sum.is_finite() {
+            return Err(
+                "selected-edge weight magnitudes exceed the finite validation range".to_string(),
+            );
+        }
         let tolerance = 8.0
             * f64::EPSILON
-            * self.edges.len().max(1) as f64
-            * expected_weight.abs().max(self.total_weight.abs()).max(1.0);
+            * (self.edges.len().max(1) as f64 + 1.0)
+            * absolute_weight_sum
+                .max(expected_weight.abs())
+                .max(self.total_weight.abs())
+                .max(1.0);
         if (self.total_weight - expected_weight).abs() > tolerance {
             return Err(format!(
                 "reported total weight {} differs from selected-edge total {expected_weight}",

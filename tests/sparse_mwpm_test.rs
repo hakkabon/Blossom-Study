@@ -1,5 +1,8 @@
+mod common;
+
 use blossom_study::graph::{Edge, Graph};
 use blossom_study::{minimum_weight_perfect_matching, sparse_minimum_weight_perfect_matching};
+use common::assert_perfect_matching;
 
 fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
     Graph::from_edges(
@@ -9,18 +12,6 @@ fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
             .map(|&(u, v, w)| Edge::new(u, v, Some(w)))
             .collect(),
     )
-}
-
-fn assert_valid_matching(graph: &Graph, result: &blossom_study::algorithms::MatchingResult) {
-    let mut matched = vec![false; graph.n];
-    for &idx in &result.edges {
-        let edge = &graph.edges[idx];
-        assert!(!matched[edge.u], "vertex {} matched multiple times", edge.u);
-        assert!(!matched[edge.v], "vertex {} matched multiple times", edge.v);
-        matched[edge.u] = true;
-        matched[edge.v] = true;
-    }
-    assert!(matched.iter().all(|&m| m), "not all vertices were matched");
 }
 
 fn brute_force(cost: &[Vec<f64>], mask: u32) -> f64 {
@@ -61,9 +52,10 @@ fn test_sparse_mwpm_matches_brute_force_oracle() {
         }
         let g = graph(n, &edges);
         let sparse_result = sparse_minimum_weight_perfect_matching(&g).unwrap();
-        assert_valid_matching(&g, &sparse_result);
+        assert_perfect_matching(&g, &sparse_result);
 
         let dense_result = minimum_weight_perfect_matching(&g).unwrap();
+        assert_perfect_matching(&g, &dense_result);
         let expected = brute_force(&costs, (1 << n) - 1);
 
         assert!(
@@ -90,7 +82,8 @@ fn test_sparse_mwpm_matches_dense_on_complete_graphs() {
         let sparse_res = sparse_minimum_weight_perfect_matching(&g).unwrap();
         let dense_res = minimum_weight_perfect_matching(&g).unwrap();
 
-        assert_valid_matching(&g, &sparse_res);
+        assert_perfect_matching(&g, &sparse_res);
+        assert_perfect_matching(&g, &dense_res);
         assert!(
             (sparse_res.total_weight - dense_res.total_weight).abs() < 1e-9,
             "n={}: sparse ({}) != dense ({})",
@@ -107,7 +100,8 @@ fn test_sparse_mwpm_on_sparse_grid() {
     let sparse_res = sparse_minimum_weight_perfect_matching(&g).unwrap();
     let dense_res = minimum_weight_perfect_matching(&g).unwrap();
 
-    assert_valid_matching(&g, &sparse_res);
+    assert_perfect_matching(&g, &sparse_res);
+    assert_perfect_matching(&g, &dense_res);
     assert!(
         (sparse_res.total_weight - dense_res.total_weight).abs() < 1e-9,
         "grid 4x4: sparse ({}) != dense ({})",
@@ -142,12 +136,13 @@ fn test_sparse_mwpm_edge_cases() {
         ],
     );
     let res_neg = sparse_minimum_weight_perfect_matching(&g_neg).unwrap();
-    assert_valid_matching(&g_neg, &res_neg);
+    assert_perfect_matching(&g_neg, &res_neg);
     assert_eq!(res_neg.total_weight, -7.0);
 
     // Empty graph
     let g_empty = graph(0, &[]);
     let res_empty = sparse_minimum_weight_perfect_matching(&g_empty).unwrap();
+    assert_perfect_matching(&g_empty, &res_empty);
     assert_eq!(res_empty.edges.len(), 0);
     assert_eq!(res_empty.total_weight, 0.0);
 }

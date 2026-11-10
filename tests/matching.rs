@@ -1,5 +1,8 @@
-use blossom_study::algorithms::{FastBlossomMatching, MatchingResult};
+mod common;
+
+use blossom_study::algorithms::FastBlossomMatching;
 use blossom_study::graph::{Edge, Graph};
+use common::assert_valid_matching;
 
 fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
     Graph::from_edges(
@@ -9,20 +12,6 @@ fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
             .map(|&(u, v, weight)| Edge::new(u, v, Some(weight)))
             .collect(),
     )
-}
-
-fn assert_valid(graph: &Graph, result: &MatchingResult) {
-    result
-        .validate(graph)
-        .unwrap_or_else(|error| panic!("invalid matching result: {error}"));
-    let mut covered = vec![false; graph.n];
-    for &edge_index in &result.edges {
-        let edge = &graph.edges[edge_index];
-        assert!(!covered[edge.u] && !covered[edge.v]);
-        covered[edge.u] = true;
-        covered[edge.v] = true;
-    }
-    assert_eq!(result.is_perfect, covered.iter().all(|&value| value));
 }
 
 #[test]
@@ -39,7 +28,7 @@ fn fast_blossom_handles_pentagon_with_tail() {
         ],
     );
     let result = FastBlossomMatching::max_cardinality_matching(&graph);
-    assert_valid(&graph, &result);
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges.len(), 3);
 }
 
@@ -61,7 +50,7 @@ fn fast_blossom_handles_nested_blossoms() {
         ],
     );
     let result = FastBlossomMatching::max_cardinality_matching(&graph);
-    assert_valid(&graph, &result);
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.edges.len(), 4);
 }
 
@@ -89,7 +78,7 @@ fn weighted_solver_finds_the_minimum_weight() {
     );
 
     let result = blossom_study::minimum_weight_perfect_matching(&graph).unwrap();
-    assert_valid(&graph, &result);
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.total_weight, 6.0);
 }
 
@@ -112,7 +101,7 @@ fn minimum_weight_supports_negative_and_parallel_edges() {
         ],
     );
     let result = blossom_study::minimum_weight_perfect_matching(&graph).unwrap();
-    assert_valid(&graph, &result);
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.total_weight, -7.0);
     assert!(result.edges.contains(&1));
 }
@@ -129,7 +118,7 @@ fn polynomial_solver_handles_more_than_twenty_four_vertices() {
     }
     let graph = graph(n, &edges);
     let result = blossom_study::minimum_weight_perfect_matching(&graph).unwrap();
-    assert_valid(&graph, &result);
+    assert_valid_matching(&graph, &result);
     assert_eq!(result.total_weight, 15.0);
 }
 
