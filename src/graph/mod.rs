@@ -50,30 +50,75 @@ impl<'de> Deserialize<'de> for Graph {
         }
 
         let stored = StoredGraph::deserialize(deserializer)?;
-        Ok(Graph::from_edges(stored.n, stored.edges))
+        Graph::try_from_edges(stored.n, stored.edges).map_err(serde::de::Error::custom)
     }
 }
 
 impl Graph {
     /// Create from an edge list using sparse derived structures.
+    ///
+    /// Panics if an edge endpoint is outside `0..n`; use [`Self::try_from_edges`]
+    /// when graph dimensions or edges come from untrusted input.
     pub fn from_edges(n: usize, edges: Vec<Edge>) -> Self {
-        Self::from_edges_sparse(n, edges)
+        Self::try_from_edges(n, edges).expect("graph edges must reference existing vertices")
     }
 
-    /// Create from edge list without dense matrix (for large graphs)
+    /// Create from edge list without dense matrix (for large graphs).
+    ///
+    /// Panics if an edge endpoint is outside `0..n`; use
+    /// [`Self::try_from_edges_sparse`] for fallible construction.
     pub fn from_edges_sparse(n: usize, edges: Vec<Edge>) -> Self {
-        let mut adj_list = vec![Vec::new(); n];
+        Self::try_from_edges_sparse(n, edges).expect("graph edges must reference existing vertices")
+    }
+
+    /// Create a graph after verifying that every edge endpoint is in `0..n`.
+    pub fn try_from_edges(n: usize, edges: Vec<Edge>) -> Result<Self, String> {
+        Self::try_from_edges_sparse(n, edges)
+    }
+
+    /// Create a sparse graph after verifying that every edge endpoint is in `0..n`.
+    pub fn try_from_edges_sparse(n: usize, edges: Vec<Edge>) -> Result<Self, String> {
+        for (idx, e) in edges.iter().enumerate() {
+            if e.u >= n || e.v >= n {
+                return Err(format!(
+                    "edge {idx} has endpoint outside 0..{n} (u={}, v={})",
+                    e.u, e.v
+                ));
+            }
+        }
+
+        let mut adj_list = Vec::new();
+        adj_list.try_reserve_exact(n).map_err(|error| {
+            format!("cannot allocate adjacency lists for {n} vertices: {error}")
+        })?;
+        adj_list.resize_with(n, Vec::new);
         for (idx, e) in edges.iter().enumerate() {
             adj_list[e.u].push(idx);
             adj_list[e.v].push(idx);
         }
-        Self {
+        Ok(Self {
             n,
             edges,
             adj_mat: None,
             adj_list,
             edge_index: None,
+        })
+    }
+
+    /// Validate endpoints in the public edge list.
+    ///
+    /// Graph fields remain public for compatibility, so callers that mutate
+    /// them directly can invalidate a previously constructed graph.
+    pub fn validate(&self) -> Result<(), String> {
+        for (idx, edge) in self.edges.iter().enumerate() {
+            if edge.u >= self.n || edge.v >= self.n {
+                return Err(format!(
+                    "edge {idx} has endpoint outside 0..{} (u={}, v={})",
+                    self.n, edge.u, edge.v
+                ));
+            }
         }
+        Ok(())
     }
 
     pub fn edge(&self, idx: usize) -> &Edge {
@@ -94,6 +139,9 @@ impl Graph {
     }
 
     pub fn is_adjacent(&self, u: usize, v: usize) -> bool {
+        if u >= self.n || v >= self.n {
+            return false;
+        }
         if let Some(am) = &self.adj_mat {
             am[u][v]
         } else {
@@ -102,7 +150,7 @@ impl Graph {
     }
 
     pub fn adj_edges(&self, u: usize) -> &[usize] {
-        &self.adj_list[u]
+        self.adj_list.get(u).map_or(&[], Vec::as_slice)
     }
 
     /// Load graph from JSON file
@@ -165,9 +213,15 @@ impl Graph {
                     let v: usize = parts[2].parse().map_err(|_| {
                         io::Error::new(io::ErrorKind::InvalidData, "Invalid vertex v in edge line")
                     })?;
+                    if u == 0 || v == 0 {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "DIMACS edge vertices are 1-based and must be positive",
+                        ));
+                    }
                     // DIMACS uses 1-based indexing, convert to 0-based
-                    let u = u.saturating_sub(1);
-                    let v = v.saturating_sub(1);
+                    let u = u - 1;
+                    let v = v - 1;
                     let weight = if parts.len() >= 4 {
                         Some(parts[3].parse().map_err(|_| {
                             io::Error::new(
@@ -189,11 +243,20 @@ impl Graph {
                 .iter()
                 .map(|e| e.u.max(e.v))
                 .max()
-                .map(|x| x + 1)
+                .map(|x| {
+                    x.checked_add(1).ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "DIMACS vertex index exceeds the supported range",
+                        )
+                    })
+                })
+                .transpose()?
                 .unwrap_or(0);
         }
 
-        Ok(Graph::from_edges(n, edges))
+        Graph::try_from_edges(n, edges)
+            .map_err(|message| io::Error::new(io::ErrorKind::InvalidData, message))
     }
 
     /// Save graph to DIMACS format file

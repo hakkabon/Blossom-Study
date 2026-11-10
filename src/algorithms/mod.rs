@@ -49,6 +49,59 @@ impl fmt::Display for MatchingResult {
     }
 }
 
+impl MatchingResult {
+    /// Check that this result is a valid matching of `graph` and that its
+    /// reported weight and perfectness agree with the selected edges.
+    pub fn validate(&self, graph: &crate::graph::Graph) -> Result<(), String> {
+        graph.validate()?;
+
+        let mut covered = vec![false; graph.n];
+        let mut expected_weight = 0.0;
+        for &edge_index in &self.edges {
+            let edge = graph.edges.get(edge_index).ok_or_else(|| {
+                format!(
+                    "matching references edge {edge_index}, but graph has {} edges",
+                    graph.edges.len()
+                )
+            })?;
+            if edge.u == edge.v {
+                return Err(format!("matching contains self-loop edge {edge_index}"));
+            }
+            if covered[edge.u] || covered[edge.v] {
+                return Err(format!(
+                    "matching contains multiple edges incident to a vertex (edge {edge_index})"
+                ));
+            }
+            covered[edge.u] = true;
+            covered[edge.v] = true;
+            expected_weight += edge.weight_or_one();
+        }
+
+        if !self.total_weight.is_finite() || !expected_weight.is_finite() {
+            return Err("matching or reported total weight is not finite".to_string());
+        }
+        let tolerance = 8.0
+            * f64::EPSILON
+            * self.edges.len().max(1) as f64
+            * expected_weight.abs().max(self.total_weight.abs()).max(1.0);
+        if (self.total_weight - expected_weight).abs() > tolerance {
+            return Err(format!(
+                "reported total weight {} differs from selected-edge total {expected_weight}",
+                self.total_weight
+            ));
+        }
+
+        let is_perfect = covered.iter().all(|&is_covered| is_covered);
+        if self.is_perfect != is_perfect {
+            return Err(format!(
+                "reported is_perfect={} but matching perfectness is {is_perfect}",
+                self.is_perfect
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct MatchingMetadata {
     pub iterations: usize,

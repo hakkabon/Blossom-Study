@@ -12,6 +12,9 @@ fn graph(n: usize, edges: &[(usize, usize, f64)]) -> Graph {
 }
 
 fn assert_valid(graph: &Graph, result: &MatchingResult) {
+    result
+        .validate(graph)
+        .unwrap_or_else(|error| panic!("invalid matching result: {error}"));
     let mut covered = vec![false; graph.n];
     for &edge_index in &result.edges {
         let edge = &graph.edges[edge_index];
