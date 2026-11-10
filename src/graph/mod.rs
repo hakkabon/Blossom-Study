@@ -3,6 +3,13 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io;
 
+fn dimacs_error(line_number: usize, message: impl std::fmt::Display) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("line {line_number}: {message}"),
+    )
+}
+
 /// Edge with optional weight
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Edge {
@@ -172,91 +179,141 @@ impl Graph {
         Self::from_dimacs_str(&content)
     }
 
-    /// Parse graph from DIMACS format string
-    /// Supports both unweighted (e u v) and weighted (e u v w) edges
+    /// Parse a DIMACS edge-format string with unweighted (`e u v`) or weighted
+    /// (`e u v w`) edge records. If present, the single problem record must be
+    /// `p edge n m`; its declared edge count and vertex range are checked.
+    /// Headerless edge lists remain supported and infer their vertex count.
+    /// Malformed records return `InvalidData` errors with their line numbers.
     pub fn from_dimacs_str(s: &str) -> Result<Self, io::Error> {
-        let mut n = 0;
+        let mut problem = None;
         let mut edges = Vec::new();
+        let mut edge_lines = Vec::new();
 
-        for line in s.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('c') {
-                continue; // Skip comments and empty lines
+        for (line_index, raw_line) in s.lines().enumerate() {
+            let line_number = line_index + 1;
+            let line = raw_line.trim();
+            if line.is_empty() {
+                continue;
             }
 
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.is_empty() {
+            if parts[0] == "c" {
                 continue;
             }
 
             match parts[0] {
                 "p" => {
-                    if parts.len() >= 4 && parts[1] == "edge" {
-                        n = parts[2].parse().map_err(|_| {
-                            io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Invalid vertex count in problem line",
-                            )
-                        })?;
-                        let _edge_count: usize = parts[3].parse().map_err(|_| {
-                            io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Invalid edge count in problem line",
-                            )
-                        })?;
+                    if parts.len() != 4 {
+                        return Err(dimacs_error(
+                            line_number,
+                            "problem record must have form `p edge <vertices> <edges>`",
+                        ));
                     }
+                    if parts[1] != "edge" {
+                        return Err(dimacs_error(
+                            line_number,
+                            format!("unsupported problem type `{}`", parts[1]),
+                        ));
+                    }
+                    if problem.is_some() {
+                        return Err(dimacs_error(line_number, "duplicate problem record"));
+                    }
+                    let vertex_count = parts[2].parse::<usize>().map_err(|_| {
+                        dimacs_error(line_number, "invalid vertex count in problem record")
+                    })?;
+                    let edge_count = parts[3].parse::<usize>().map_err(|_| {
+                        dimacs_error(line_number, "invalid edge count in problem record")
+                    })?;
+                    problem = Some((vertex_count, edge_count, line_number));
                 }
-                "e" if parts.len() >= 3 => {
-                    let u: usize = parts[1].parse().map_err(|_| {
-                        io::Error::new(io::ErrorKind::InvalidData, "Invalid vertex u in edge line")
-                    })?;
-                    let v: usize = parts[2].parse().map_err(|_| {
-                        io::Error::new(io::ErrorKind::InvalidData, "Invalid vertex v in edge line")
-                    })?;
+                "e" => {
+                    if parts.len() != 3 && parts.len() != 4 {
+                        return Err(dimacs_error(
+                            line_number,
+                            "edge record must have form `e <u> <v> [weight]`",
+                        ));
+                    }
+                    let u = parts[1]
+                        .parse::<usize>()
+                        .map_err(|_| dimacs_error(line_number, "invalid vertex u"))?;
+                    let v = parts[2]
+                        .parse::<usize>()
+                        .map_err(|_| dimacs_error(line_number, "invalid vertex v"))?;
                     if u == 0 || v == 0 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
+                        return Err(dimacs_error(
+                            line_number,
                             "DIMACS edge vertices are 1-based and must be positive",
                         ));
                     }
                     // DIMACS uses 1-based indexing, convert to 0-based
                     let u = u - 1;
                     let v = v - 1;
-                    let weight = if parts.len() >= 4 {
-                        Some(parts[3].parse().map_err(|_| {
-                            io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Invalid weight in edge line",
-                            )
-                        })?)
+                    let weight = if parts.len() == 4 {
+                        let weight = parts[3]
+                            .parse::<f64>()
+                            .map_err(|_| dimacs_error(line_number, "invalid edge weight"))?;
+                        if !weight.is_finite() {
+                            return Err(dimacs_error(line_number, "edge weight must be finite"));
+                        }
+                        Some(weight)
                     } else {
                         None
                     };
                     edges.push(Edge::new(u, v, weight));
+                    edge_lines.push(line_number);
                 }
-                _ => {}
+                record => {
+                    return Err(dimacs_error(
+                        line_number,
+                        format!("unsupported record type `{record}`"),
+                    ));
+                }
             }
         }
 
-        if n == 0 {
-            n = edges
+        let n = if let Some((vertex_count, declared_edges, problem_line)) = problem {
+            if declared_edges != edges.len() {
+                return Err(dimacs_error(
+                    problem_line,
+                    format!(
+                        "problem record declares {declared_edges} edges, but found {}",
+                        edges.len()
+                    ),
+                ));
+            }
+            for (edge_index, edge) in edges.iter().enumerate() {
+                if edge.u >= vertex_count || edge.v >= vertex_count {
+                    return Err(dimacs_error(
+                        edge_lines[edge_index],
+                        format!(
+                            "edge endpoint ({}, {}) is outside 1..={vertex_count}",
+                            edge.u + 1,
+                            edge.v + 1
+                        ),
+                    ));
+                }
+            }
+            vertex_count
+        } else {
+            edges
                 .iter()
-                .map(|e| e.u.max(e.v))
+                .map(|edge| edge.u.max(edge.v))
                 .max()
-                .map(|x| {
-                    x.checked_add(1).ok_or_else(|| {
-                        io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "DIMACS vertex index exceeds the supported range",
-                        )
+                .map(|max_vertex| {
+                    max_vertex.checked_add(1).ok_or_else(|| {
+                        dimacs_error(edge_lines[0], "vertex index exceeds the supported range")
                     })
                 })
                 .transpose()?
-                .unwrap_or(0);
-        }
+                .unwrap_or(0)
+        };
 
-        Graph::try_from_edges(n, edges)
-            .map_err(|message| io::Error::new(io::ErrorKind::InvalidData, message))
+        Graph::try_from_edges(n, edges).map_err(|message| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("invalid DIMACS graph: {message}"),
+            )
+        })
     }
 
     /// Save graph to DIMACS format file

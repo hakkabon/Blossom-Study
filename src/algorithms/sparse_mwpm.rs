@@ -26,14 +26,19 @@ pub struct SparseEdge {
 }
 
 impl SparseEdge {
+    /// Construct a 1-indexed sparse edge, rejecting endpoints that cannot be
+    /// represented by the solver's `u32` vertex identifiers.
     #[inline]
-    pub fn new(u: usize, v: usize, original_index: usize, weight: i128) -> Self {
-        Self {
-            u: u as u32,
-            v: v as u32,
+    pub fn new(u: usize, v: usize, original_index: usize, weight: i128) -> Result<Self, String> {
+        if u == 0 || v == 0 {
+            return Err("sparse edge endpoints must use 1-based indices".to_string());
+        }
+        Ok(Self {
+            u: u32::try_from(u).map_err(|_| format!("sparse edge endpoint {u} exceeds u32"))?,
+            v: u32::try_from(v).map_err(|_| format!("sparse edge endpoint {v} exceeds u32"))?,
             original_index,
             weight,
-        }
+        })
     }
 
     #[inline]
@@ -539,6 +544,9 @@ pub fn sparse_minimum_weight_perfect_matching(graph: &Graph) -> Result<MatchingR
         });
     }
 
+    u32::try_from(graph.n)
+        .map_err(|_| format!("sparse solver supports at most {} vertices", u32::MAX))?;
+
     let start = Instant::now();
 
     // 1. Validate and filter edges
@@ -601,8 +609,8 @@ pub fn sparse_minimum_weight_perfect_matching(graph: &Graph) -> Result<MatchingR
     let mut adj = vec![Vec::new(); graph.n + 1];
     for (u, v, orig_idx, cost) in scaled_edges {
         let weight: i128 = cardinality_bonus - (cost - min_cost);
-        let e1 = SparseEdge::new(u + 1, v + 1, orig_idx, weight);
-        let e2 = SparseEdge::new(v + 1, u + 1, orig_idx, weight);
+        let e1 = SparseEdge::new(u + 1, v + 1, orig_idx, weight)?;
+        let e2 = SparseEdge::new(v + 1, u + 1, orig_idx, weight)?;
         adj[u + 1].push(e1);
         adj[v + 1].push(e2);
     }

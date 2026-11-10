@@ -94,6 +94,10 @@ cargo run -- min-weight-perfect --solver blossom-tree -i graph.json
 cargo run -- min-weight-perfect --solver cherry-tree -i graph.json
 ```
 
+### Input validation
+
+JSON graph deserialization and the fallible graph constructors reject edge endpoints outside `0..n`. DIMACS input supports comments, one optional `p edge <vertices> <edges>` record, and `e <u> <v>` or `e <u> <v> <weight>` records. When a problem record is present, its vertex range and declared edge count are checked. Malformed records, zero/out-of-range DIMACS vertices, and non-finite weights return line-numbered errors. Headerless edge lists remain supported and infer the vertex count.
+
 ### Benchmarks
 
 ```bash
