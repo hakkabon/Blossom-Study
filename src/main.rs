@@ -28,10 +28,6 @@ pub enum WeightedAlgorithm {
     BlossomEngine,
     /// Sparse event-driven primal-dual implementation
     SparseBlossom,
-    /// MIT-attributed flat-containment Blossom-Tree implementation
-    BlossomTree,
-    /// Self-contained repaired Cherry-Tree primal-dual implementation
-    CherryTree,
     /// Duan–Pettie–Su scaling reference (integer edge weights)
     DuanScaling,
 }
@@ -47,8 +43,6 @@ impl WeightedAlgorithm {
                 algorithms::blossom_engine_minimum_weight_perfect_matching(graph)
             }
             Self::SparseBlossom => algorithms::sparse_minimum_weight_perfect_matching(graph),
-            Self::BlossomTree => algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
-            Self::CherryTree => algorithms::cherry_tree_minimum_weight_perfect_matching(graph),
             Self::DuanScaling => algorithms::duan_minimum_weight_perfect_matching(graph),
         }
     }
@@ -385,16 +379,6 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
                                 "sparse-blossom",
                                 WeightedAlgorithm::SparseBlossom.min_weight_perfect(&graph),
                             ),
-                            "blossom_tree" | "blossom-tree" => (
-                                "minimum-weight-perfect",
-                                "blossom-tree",
-                                WeightedAlgorithm::BlossomTree.min_weight_perfect(&graph),
-                            ),
-                            "cherry_tree" | "cherry-tree" => (
-                                "minimum-weight-perfect",
-                                "cherry-tree",
-                                WeightedAlgorithm::CherryTree.min_weight_perfect(&graph),
-                            ),
                             _ => anyhow::bail!("Unknown benchmark algorithm '{algo_name}'"),
                         };
 
@@ -684,16 +668,6 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                                     WeightedAlgorithm::SparseBlossom
                                 }
                                 Some(name)
-                                    if matches!(name.as_str(), "blossom-tree" | "blossom_tree") =>
-                                {
-                                    WeightedAlgorithm::BlossomTree
-                                }
-                                Some(name)
-                                    if matches!(name.as_str(), "cherry-tree" | "cherry_tree") =>
-                                {
-                                    WeightedAlgorithm::CherryTree
-                                }
-                                Some(name)
                                     if matches!(
                                         name.as_str(),
                                         "duan-scaling" | "duan_scaling" | "duan"
@@ -703,7 +677,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                                 }
                                 Some(name) => {
                                     println!(
-                                        "Unknown weighted solver: {name}. Use 'primal-dual', 'blossom-engine', 'sparse-blossom', 'blossom-tree', 'cherry-tree', or 'duan-scaling'"
+                                        "Unknown weighted solver: {name}. Use 'primal-dual', 'blossom-engine', 'sparse-blossom', or 'duan-scaling'"
                                     );
                                     continue;
                                 }

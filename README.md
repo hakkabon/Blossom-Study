@@ -20,9 +20,6 @@ blossom-study/
 │       ├── hopcroft_karp.rs # Bipartite maximum-cardinality solver
 │       ├── hungarian.rs    # Bipartite assignment primal-dual solver
 │       ├── blossom_engine.rs # Independent weighted blossom solver
-│       ├── blossom_tree.rs # Flat-containment adapter
-│       ├── blossom_tree_flat.rs # MIT-attributed Blossom-Tree engine
-│       ├── cherry_tree_solver.rs # Self-contained repaired Cherry-Tree solver
 │       ├── mwpm.rs         # Active weighted primal-dual solver adapter
 │       ├── sparse_mwpm.rs  # Sparse event-driven experiment
 │       └── korte_vygen.rs  # Reference-only implementation
@@ -32,6 +29,7 @@ blossom-study/
 │   ├── hopcroft_karp_test.rs # Bipartite cardinality/oracle tests
 │   ├── hungarian_test.rs   # Bipartite assignment/oracle tests
 │   ├── oracle_comparison_test.rs # Independent exact oracles for cardinality and weighted solvers
+│   ├── weighted_regressions_test.rs # Retained weighted defect graphs
 │   ├── matching.rs         # Integration and cross-implementation tests
 │   └── data/               # Test graph fixtures
 ├── bench/
@@ -54,20 +52,18 @@ blossom-study/
 - ✅ **Shared DSU**: fast blossom, the Gabow tracks, the MV petal search, and the retained Korte–Vygen reference use `implementations/dsu/`. Directed contraction keeps the requested blossom base; ordinary union reports its chosen root.
 - ✅ **Gabow-family cardinality implementations**: `gabow-weighted-approach` builds a tight-edge auxiliary graph from an Edmonds search; `mehlhorn-nobahari` uses the revised shortest-path search. Their source is kept in separate, small modules under `implementations/`.
 - ✅ **Hopcroft–Karp Bipartite Matching** (`hopcroft-karp`): $O(m \sqrt{n})$ multi-phase bipartite maximum cardinality matching.
-- ✅ **O(V³) Minimum-Weight Perfect Matching**:
+- ✅ **General-graph Minimum-Weight Perfect Matching**:
   - `primal-dual`: Standard dense-matrix primal-dual baseline with exact `i128` dual arithmetic.
   - `blossom-engine`: Independent Galil/Edmonds primal-dual solver with explicit alternating forests and nested blossoms.
-  - `blossom-tree`: Flat-containment Blossom-Tree solver adapted from MIT-licensed `mwmatching`.
-  - `cherry-tree`: Self-contained repaired Cherry-Tree primal-dual solver with recursive path lifting.
   - `sparse-blossom`: Sparse event-driven adjacency/map implementation.
   - `duan-scaling`: integer-weight scaling implementation of Duan–Pettie–Su's Liquidationist framework. It uses simpler search/event routines than the paper, so its published runtime bound does not apply.
 - ✅ **Hungarian Bipartite Assignment**: $O(k^3)$ primal-dual shortest augmenting paths with exact cost scaling.
 - ✅ **Graph Generators & Serialization**: Complete, sparse, grid, and planted matching generators with JSON serialization.
-- ✅ **Independent exact test oracles**: registered general-cardinality solvers are checked on every simple graph through six vertices. All five weighted general-graph solvers are checked against an independent dynamic-programming oracle on reproducible sparse instances up to ten vertices, with odd, infeasible, and empty graph cases. These finite tests provide regression coverage, not a proof of correctness on arbitrary graphs.
+- ✅ **Independent exact test oracles**: registered general-cardinality solvers are checked on every simple graph through six vertices. The three general weighted solvers in the shared oracle suite are checked against dynamic programming on reproducible sparse instances up to ten vertices; Duan scaling has a separate exhaustive small-graph test. Retired solvers' defect graphs remain in `weighted_regressions_test.rs`. These finite tests provide regression coverage, not a proof of correctness on arbitrary graphs.
 
 ### Performance interpretation
 
-Use the benchmark commands below for measurements on your machine. The generic runner compares completed solvers only; it excludes both experimental phased cardinality tracks. Criterion includes a separately named MV level-search-only development group, which is not an end-to-end solver benchmark. No MV timing constitutes a comparison with the published algorithm or evidence for its asymptotic bound. Check matching correctness before comparing times.
+Use the benchmark commands below for measurements on your machine. The generic runner excludes experimental Micali–Vazirani. Criterion includes a separately named MV level-search-only development group, which is not an end-to-end solver benchmark. No MV timing constitutes a comparison with the published algorithm or evidence for its asymptotic bound. Check matching correctness before comparing times.
 
 Run the independent exact-oracle comparisons with:
 
@@ -106,12 +102,6 @@ cargo run -- min-weight-perfect --solver blossom-engine -i graph.json
 
 # Sparse event-driven experiment
 cargo run -- min-weight-perfect --solver sparse-blossom -i graph.json
-
-# Flat-containment Blossom-Tree variant
-cargo run -- min-weight-perfect --solver blossom-tree -i graph.json
-
-# Repaired self-contained Cherry-Tree implementation
-cargo run -- min-weight-perfect --solver cherry-tree -i graph.json
 
 # Duan–Pettie–Su scaling study (exact integer conversion must fit i64)
 cargo run -- min-weight-perfect --solver duan-scaling -i graph.json
@@ -177,8 +167,7 @@ measurement; use Criterion's reported measurements for benchmark comparisons.
 | `hopcroft-karp` | Adjacency entries examined by BFS and DFS | Successful shortest augmenting paths | Blossom and dual-update counters are not applicable |
 | Hungarian | Candidate row/column entries examined by the assignment search | Rows inserted into the assignment, one augmentation attempt per left vertex | `dual_updates` counts potential-adjustment steps; blossom counters are not applicable |
 | `primal-dual` | Not instrumented (`0`) | Reported perfect-matching cardinality, `n / 2`, not an internal counter | Blossom and dual-update counters are not exposed by the wrapped dependency |
-| `blossom-tree` | Not instrumented (`0`) | Reported perfect-matching cardinality, `n / 2`, not an internal counter | Blossom and dual-update counters are not instrumented |
-| `blossom-engine`, `cherry-tree` | Edge scans | Successful augmentations | Blossom creations/expansions and dual adjustments are counted by the implementation |
+| `blossom-engine` | Edge scans | Successful augmentations | Blossom creations/expansions and dual adjustments are counted by the implementation |
 | `sparse-blossom` | Search-queue entries processed | Reported perfect-matching cardinality, `n / 2`, not an internal counter | Blossom creations/expansions and dual adjustments are counted; its augmentation counter is inferred |
 
 ---
@@ -204,8 +193,6 @@ These are in-repository weighted matching studies with distinct state representa
 
 - **`primal-dual` — weighted baseline.** Uses edge-list Edmonds/Galil alternating forests, integer-scaled costs and exact `i128` dual updates. Background: [Galil (1986)](https://doi.org/10.1145/6462.6502).
 - **`blossom-engine` — independent weighted state machine.** Makes blossom creation, dual adjustments and path lifting explicit for study; it solves the same weighted matching problem through a separate implementation. Background: [Edmonds (1965)](https://doi.org/10.1145/321250.321261); [Galil (1986)](https://doi.org/10.1145/6462.6502).
-- **`blossom-tree` — flat-containment variant.** Tracks nested contractions with a flat history and maps the final mate pairs back to input edges. Its code lineage is the MIT-licensed `mwmatching` adaptation, not Blossom V. Background: [Galil (1986)](https://doi.org/10.1145/6462.6502).
-- **`cherry-tree` — ordered blossom variant.** Represents nested odd cycles as cherries and recursively lifts paths through them. This is an educational representation of weighted primal-dual matching, not a claim to a distinct published complexity bound. Background: [Edmonds (1965)](https://doi.org/10.1145/321250.321261).
 - **`sparse-blossom` — event-driven sparse experiment.** Uses incident-edge maps rather than a dense weight matrix, while retaining weighted blossom/dual operations. Its amortized bound is not proved here. Background: [Kolmogorov's Blossom V paper (2009)](https://pub.ista.ac.at/~vnk/papers/blossom5.pdf) for a contrasting mature weighted implementation.
 - **`duan-scaling` — Liquidationist integer scaling study.** Carries duals and inherited blossoms across bits, liquidates blossoms, and uses SearchOne before final perfection. The source preserves its BSD notice and implementation notes in `implementations/duan_mwpm/`. It omits the specialized data structures needed for the paper's $O(m\sqrt n\log(nN))$ bound. The adapter preserves exact costs only if a common binary scaling fits signed 64-bit integers; otherwise it reports an error. Literature: [Duan, Pettie, and Su (2017)](https://arxiv.org/abs/1411.1919).
 

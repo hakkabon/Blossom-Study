@@ -1,9 +1,8 @@
 use blossom_study::{
     MatchingResult,
     algorithms::{
-        blossom_engine_minimum_weight_perfect_matching,
-        blossom_tree_minimum_weight_perfect_matching, cherry_tree_minimum_weight_perfect_matching,
-        minimum_weight_perfect_matching, sparse_minimum_weight_perfect_matching,
+        blossom_engine_minimum_weight_perfect_matching, minimum_weight_perfect_matching,
+        sparse_minimum_weight_perfect_matching,
     },
     benchmark::compare_general_cardinality,
     graph::{Edge, Graph},
@@ -123,15 +122,13 @@ fn minimum_weight_oracle(costs: &[Vec<Option<f64>>]) -> Option<f64> {
     solve((1 << costs.len()) - 1, costs, &mut memo)
 }
 
-fn weighted_solvers() -> [(&'static str, fn(&Graph) -> Result<MatchingResult, String>); 5] {
+fn weighted_solvers() -> [(&'static str, fn(&Graph) -> Result<MatchingResult, String>); 3] {
     [
         ("primal-dual", minimum_weight_perfect_matching),
         (
             "blossom-engine",
             blossom_engine_minimum_weight_perfect_matching,
         ),
-        ("blossom-tree", blossom_tree_minimum_weight_perfect_matching),
-        ("cherry-tree", cherry_tree_minimum_weight_perfect_matching),
         ("sparse-blossom", sparse_minimum_weight_perfect_matching),
     ]
 }

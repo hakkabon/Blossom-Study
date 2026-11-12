@@ -78,12 +78,7 @@ fn documented_cli_workflow_succeeds() {
     );
     assert!(String::from_utf8_lossy(&blossom_engine.stdout).contains("is_perfect=true"));
 
-    for solver in [
-        "sparse-blossom",
-        "blossom-tree",
-        "cherry-tree",
-        "duan-scaling",
-    ] {
+    for solver in ["sparse-blossom", "duan-scaling"] {
         let output = run(&["min-weight-perfect", "--solver", solver, "-i", graph_path]);
         assert!(
             output.status.success(),

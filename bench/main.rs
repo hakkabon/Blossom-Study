@@ -77,14 +77,6 @@ fn main() {
                 blossom_study::blossom_engine_minimum_weight_perfect_matching(graph),
             ),
             (
-                "blossom-tree",
-                blossom_study::blossom_tree_minimum_weight_perfect_matching(graph),
-            ),
-            (
-                "cherry-tree",
-                blossom_study::cherry_tree_minimum_weight_perfect_matching(graph),
-            ),
-            (
                 "sparse-blossom",
                 blossom_study::sparse_minimum_weight_perfect_matching(graph),
             ),
@@ -120,14 +112,6 @@ fn main() {
             (
                 "blossom-engine",
                 blossom_study::blossom_engine_minimum_weight_perfect_matching(&graph),
-            ),
-            (
-                "blossom-tree",
-                blossom_study::blossom_tree_minimum_weight_perfect_matching(&graph),
-            ),
-            (
-                "cherry-tree",
-                blossom_study::cherry_tree_minimum_weight_perfect_matching(&graph),
             ),
             (
                 "sparse-blossom",

@@ -215,14 +215,6 @@ fn preflight_general_weighted_solvers(graph: &Graph) -> Result<(), String> {
                 blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(graph),
             ),
             (
-                "blossom-tree",
-                blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
-            ),
-            (
-                "cherry-tree",
-                blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph),
-            ),
-            (
                 "sparse-blossom",
                 blossom_study::algorithms::sparse_minimum_weight_perfect_matching(graph),
             ),
@@ -291,20 +283,6 @@ fn weighted_benchmarks_dense(c: &mut Criterion) {
                 )
             });
         });
-        group.bench_with_input(BenchmarkId::new("blossom-tree", n), &graph, |b, graph| {
-            b.iter(|| {
-                require_timed_result(
-                    blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
-                )
-            });
-        });
-        group.bench_with_input(BenchmarkId::new("cherry-tree", n), &graph, |b, graph| {
-            b.iter(|| {
-                require_timed_result(
-                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph),
-                )
-            });
-        });
         group.bench_with_input(BenchmarkId::new("sparse-blossom", n), &graph, |b, graph| {
             b.iter(|| {
                 require_timed_result(
@@ -356,20 +334,6 @@ fn weighted_benchmarks_sparse(c: &mut Criterion) {
                     blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(
                         graph,
                     ),
-                )
-            });
-        });
-        group.bench_with_input(BenchmarkId::new("blossom-tree", n), &graph, |b, graph| {
-            b.iter(|| {
-                require_timed_result(
-                    blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
-                )
-            });
-        });
-        group.bench_with_input(BenchmarkId::new("cherry-tree", n), &graph, |b, graph| {
-            b.iter(|| {
-                require_timed_result(
-                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(graph),
                 )
             });
         });
@@ -545,14 +509,6 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
                     ),
                 ),
                 (
-                    "blossom-tree",
-                    blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(&graph),
-                ),
-                (
-                    "cherry-tree",
-                    blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(&graph),
-                ),
-                (
                     "sparse-blossom",
                     blossom_study::algorithms::sparse_minimum_weight_perfect_matching(&graph),
                 ),
@@ -598,32 +554,6 @@ fn weighted_benchmarks_bipartite(c: &mut Criterion) {
                 b.iter(|| {
                     require_timed_result(
                         blossom_study::algorithms::blossom_engine_minimum_weight_perfect_matching(
-                            graph,
-                        ),
-                    )
-                });
-            },
-        );
-        group.bench_with_input(
-            BenchmarkId::new("blossom-tree", &parameter),
-            &graph,
-            |b, graph| {
-                b.iter(|| {
-                    require_timed_result(
-                        blossom_study::algorithms::blossom_tree_minimum_weight_perfect_matching(
-                            graph,
-                        ),
-                    )
-                });
-            },
-        );
-        group.bench_with_input(
-            BenchmarkId::new("cherry-tree", &parameter),
-            &graph,
-            |b, graph| {
-                b.iter(|| {
-                    require_timed_result(
-                        blossom_study::algorithms::cherry_tree_minimum_weight_perfect_matching(
                             graph,
                         ),
                     )
