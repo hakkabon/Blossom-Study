@@ -1,6 +1,6 @@
-//! Historical trace-to-root regressions for the experimental Gabow track.
+//! Historical trace-to-root regressions for the Gabow-inspired heuristic.
 
-use blossom_study::{Edge, GabowCardinality, Graph};
+use blossom_study::{Edge, GabowHeuristic, Graph};
 
 /// Former defect 1: trace_to_root could not trace non-root outer vertices.
 ///
@@ -20,7 +20,7 @@ fn gabow_phase2_augments_length3_path() {
         ],
     );
     let mate = vec![None, Some(2), Some(1), None];
-    let mut solver = GabowCardinality::with_matching(&graph, mate).unwrap();
+    let mut solver = GabowHeuristic::with_matching(&graph, mate).unwrap();
 
     let (shortest_len, bridges) = solver.phase1_search(&graph);
     assert_eq!(shortest_len, Some(3), "Phase 1 finds length-3 path");
@@ -41,7 +41,7 @@ fn gabow_phase2_augments_length3_path() {
 #[test]
 fn gabow_phase2_works_for_length1() {
     let graph = Graph::from_edges(2, vec![Edge::new(0, 1, None)]);
-    let mut solver = GabowCardinality::new(&graph);
+    let mut solver = GabowHeuristic::new(&graph);
     let (len, bridges) = solver.phase1_search(&graph);
     assert_eq!(len, Some(1));
     let aug = solver.phase2_augment(&graph, 1, &bridges);
@@ -69,7 +69,7 @@ fn gabow_trace_to_root_lifts_blossom_interior() {
         ],
     );
     let mate = vec![Some(1), Some(0), None, None];
-    let mut solver = GabowCardinality::with_matching(&graph, mate).unwrap();
+    let mut solver = GabowHeuristic::with_matching(&graph, mate).unwrap();
 
     let (shortest_len, bridges) = solver.phase1_search(&graph);
 

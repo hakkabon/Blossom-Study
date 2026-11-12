@@ -24,7 +24,7 @@ blossom-study/
 │       ├── sparse_mwpm.rs  # Sparse event-driven experiment
 │       └── korte_vygen.rs  # Reference-only implementation
 ├── tests/
-│   ├── gabow_cardinality_test.rs # Gabow-inspired heuristic tests
+│   ├── gabow_heuristic_test.rs # Gabow-inspired heuristic tests
 │   ├── micali_vazirani_test.rs # Micali–Vazirani tests, nested petals, and oracle checks
 │   ├── hopcroft_karp_test.rs # Bipartite cardinality/oracle tests
 │   ├── hungarian_test.rs   # Bipartite assignment/oracle tests

@@ -148,7 +148,6 @@ pub struct MatchingMetadata {
 pub mod blossom_engine;
 pub mod duan_mwpm;
 pub mod fast_blossom;
-pub mod gabow_cardinality;
 pub mod gabow_heuristic;
 pub mod general_cardinality;
 pub mod hopcroft_karp;
@@ -162,7 +161,6 @@ pub mod sparse_mwpm;
 pub use blossom_engine::{BlossomEngine, blossom_engine_minimum_weight_perfect_matching};
 pub use duan_mwpm::duan_minimum_weight_perfect_matching;
 pub use fast_blossom::FastBlossomMatching;
-pub use gabow_cardinality::GabowCardinality;
 pub use gabow_heuristic::{GabowHeuristic, gabow_heuristic_matching};
 pub use hopcroft_karp::{HopcroftKarpSolver, hopcroft_karp_maximum_cardinality_matching};
 pub use hungarian::{HungarianSolver, hungarian_minimum_weight_perfect_matching};
