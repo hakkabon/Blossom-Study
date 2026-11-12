@@ -9,6 +9,7 @@ blossom-study/
 ├── src/
 │   ├── lib.rs              # Library exports
 │   ├── main.rs             # CLI and REPL for running matching algorithms
+│   ├── bin/                # Isolated profiling worker and failure reducer
 │   ├── graph/
 │   │   └── mod.rs          # Graph representations and generators
 │   └── algorithms/
@@ -35,6 +36,8 @@ blossom-study/
 │   └── data/               # Test graph fixtures
 ├── bench/
 │   ├── main.rs             # Quick comparison runner
+│   ├── profile_solvers.py  # Per-process time and RSS profiler
+│   ├── profiles/           # Saved profile configuration and measurements
 │   └── records/            # Saved reproducible smoke-run inputs and outputs
 ├── benches/
 │   └── matching.rs         # Criterion benchmark groups
@@ -69,6 +72,11 @@ blossom-study/
 ### Performance interpretation
 
 Use the benchmark commands below for measurements on your machine. The generic runner excludes experimental Micali–Vazirani. Criterion includes a separately named MV level-search-only development group, which is not an end-to-end solver benchmark. No MV timing constitutes a comparison with the published algorithm or evidence for its asymptotic bound. See [benchmark records](bench/records/README.md) for a saved, seeded smoke run and its measurement limits.
+
+For time and peak-process-memory profiles by graph size, density, and weight
+range, use the [per-solver profiler](bench/profiles/README.md). Its saved
+baseline includes two reproducible `blossom-engine` false-infeasibility cases
+at 80 vertices; the reduced graphs are kept with the profile records.
 
 Run the independent exact-oracle comparisons with:
 

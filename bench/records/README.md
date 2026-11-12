@@ -37,3 +37,6 @@ random complete-graph weights, so their generated inputs are shared within a
 single group execution but are not identical across separate invocations.
 The MV group times only its level-search phase. Keep general-cardinality,
 general-weighted, and bipartite comparisons separate.
+
+For isolated per-solver time and peak-process-memory measurements across size,
+density, and weight range, see the [profiling workflow](../profiles/README.md).

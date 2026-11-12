@@ -1,0 +1,21 @@
+{
+  "schema": "blossom-study-profile-v1",
+  "config": "bench/profiles/phase3-profile-config.json",
+  "config_sha256": "9d6c1997d7d188cbde19cd414fb639cb3fc431439de7cd7124abd86f272cfb19",
+  "driver_sha256": "cb8bea628d385b67ae7061c6aadd54fd32de906d73b974f4bbd70c5551b28007",
+  "worker": "/Users/uffe/Documents/ai-coding/codex/Blossom-Study/target/release/profile_worker",
+  "worker_sha256": "47c2eea1a932baf37fd640bf7d73f74e8cdf7aa109dd1c3c09ec7d30eb42693b",
+  "source_commit": "375c4d7ae5369ce2163547abe887689f8fb15ca2",
+  "source_dirty": true,
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "python": "3.11.4",
+  "rss_unit_source": "wait4 ru_maxrss; bytes on macOS, KiB on Linux",
+  "record_count": 312,
+  "timeout_s": 10.0,
+  "status_counts": {
+    "error": 2,
+    "ok": 310
+  },
+  "measurement": "child peak RSS includes process startup, graph load, solver, validation, and output"
+}

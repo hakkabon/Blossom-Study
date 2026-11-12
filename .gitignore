@@ -4,6 +4,8 @@
 # Ignore the main cargo build outputs
 **/target/
 **/target-*/
+**/__pycache__/
+*.pyc
 
 # Cargo local config overrides
 **/*.rs.bk

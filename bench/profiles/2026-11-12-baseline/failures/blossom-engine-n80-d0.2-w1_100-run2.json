@@ -1,0 +1,250 @@
+{
+  "edges": [
+    {
+      "u": 0,
+      "v": 27,
+      "weight": 57.0
+    },
+    {
+      "u": 1,
+      "v": 7,
+      "weight": 45.0
+    },
+    {
+      "u": 2,
+      "v": 3,
+      "weight": 54.0
+    },
+    {
+      "u": 4,
+      "v": 44,
+      "weight": 19.0
+    },
+    {
+      "u": 5,
+      "v": 6,
+      "weight": 67.0
+    },
+    {
+      "u": 8,
+      "v": 29,
+      "weight": 34.0
+    },
+    {
+      "u": 9,
+      "v": 31,
+      "weight": 5.0
+    },
+    {
+      "u": 10,
+      "v": 34,
+      "weight": 50.0
+    },
+    {
+      "u": 11,
+      "v": 35,
+      "weight": 28.0
+    },
+    {
+      "u": 12,
+      "v": 36,
+      "weight": 20.0
+    },
+    {
+      "u": 13,
+      "v": 47,
+      "weight": 77.0
+    },
+    {
+      "u": 14,
+      "v": 32,
+      "weight": 44.0
+    },
+    {
+      "u": 15,
+      "v": 28,
+      "weight": 84.0
+    },
+    {
+      "u": 16,
+      "v": 40,
+      "weight": 55.0
+    },
+    {
+      "u": 17,
+      "v": 46,
+      "weight": 69.0
+    },
+    {
+      "u": 18,
+      "v": 37,
+      "weight": 87.0
+    },
+    {
+      "u": 19,
+      "v": 41,
+      "weight": 21.0
+    },
+    {
+      "u": 20,
+      "v": 33,
+      "weight": 14.0
+    },
+    {
+      "u": 21,
+      "v": 30,
+      "weight": 8.0
+    },
+    {
+      "u": 22,
+      "v": 45,
+      "weight": 69.0
+    },
+    {
+      "u": 23,
+      "v": 39,
+      "weight": 29.0
+    },
+    {
+      "u": 24,
+      "v": 38,
+      "weight": 78.0
+    },
+    {
+      "u": 25,
+      "v": 26,
+      "weight": 80.0
+    },
+    {
+      "u": 42,
+      "v": 68,
+      "weight": 48.0
+    },
+    {
+      "u": 43,
+      "v": 57,
+      "weight": 45.0
+    },
+    {
+      "u": 48,
+      "v": 77,
+      "weight": 31.0
+    },
+    {
+      "u": 49,
+      "v": 56,
+      "weight": 66.0
+    },
+    {
+      "u": 50,
+      "v": 70,
+      "weight": 35.0
+    },
+    {
+      "u": 51,
+      "v": 52,
+      "weight": 18.0
+    },
+    {
+      "u": 51,
+      "v": 63,
+      "weight": 49.0
+    },
+    {
+      "u": 52,
+      "v": 53,
+      "weight": 8.0
+    },
+    {
+      "u": 52,
+      "v": 54,
+      "weight": 80.0
+    },
+    {
+      "u": 52,
+      "v": 55,
+      "weight": 2.0
+    },
+    {
+      "u": 52,
+      "v": 78,
+      "weight": 2.0
+    },
+    {
+      "u": 53,
+      "v": 55,
+      "weight": 22.0
+    },
+    {
+      "u": 58,
+      "v": 66,
+      "weight": 31.0
+    },
+    {
+      "u": 59,
+      "v": 78,
+      "weight": 84.0
+    },
+    {
+      "u": 60,
+      "v": 61,
+      "weight": 75.0
+    },
+    {
+      "u": 62,
+      "v": 75,
+      "weight": 18.0
+    },
+    {
+      "u": 62,
+      "v": 78,
+      "weight": 8.0
+    },
+    {
+      "u": 64,
+      "v": 74,
+      "weight": 86.0
+    },
+    {
+      "u": 65,
+      "v": 67,
+      "weight": 97.0
+    },
+    {
+      "u": 69,
+      "v": 79,
+      "weight": 94.0
+    },
+    {
+      "u": 71,
+      "v": 76,
+      "weight": 1.0
+    },
+    {
+      "u": 72,
+      "v": 73,
+      "weight": 77.0
+    }
+  ],
+  "error_substring": "graph does not have a perfect matching",
+  "minimized_edge_count": 45,
+  "n": 80,
+  "original_edge_count": 675,
+  "predicate_evaluations": 2457,
+  "reduction": "one-edge-minimal for false infeasibility at fixed vertex count and weights",
+  "reference": "fast-blossom returned a perfect matching",
+  "solver": "blossom-engine",
+  "seed": 6840227782638523138,
+  "original_graph_sha256": "b0380e259e30a51e04827ba8cbc03540596f310164000c41a25f92ff05668184",
+  "profile_row": {
+    "family": "general",
+    "n": 80,
+    "requested_density": 0.2,
+    "weight_range": [
+      1,
+      100
+    ],
+    "run": 2,
+    "error": "Error: graph does not have a perfect matching: 8 of 80 vertices could not be matched"
+  }
+}

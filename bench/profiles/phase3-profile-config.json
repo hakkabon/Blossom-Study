@@ -1,0 +1,14 @@
+{
+  "seed": 6840227782638523137,
+  "runs": 2,
+  "general": {
+    "sizes": [20, 40, 80],
+    "densities": [0.2, 1.0],
+    "weight_ranges": [[1, 100], [-1000, 1000]]
+  },
+  "bipartite": {
+    "sizes": [10, 20, 40],
+    "densities": [0.2, 1.0],
+    "weight_ranges": [[1, 100], [-1000, 1000]]
+  }
+}
