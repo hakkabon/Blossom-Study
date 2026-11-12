@@ -144,6 +144,47 @@ fn gabow_does_not_stop_at_false_optimum_on_eight_vertices() {
 }
 
 #[test]
+fn gabow_skips_paths_through_roots_matched_earlier_in_the_phase() {
+    // In the second phase, one path ends at free root 7. A later candidate
+    // reaches that same root through 4--6. Tracing against the updated mate
+    // and the old BFS parent pointers used to cycle 7 -> 1 -> 7 forever.
+    let pairs = [
+        (0, 2),
+        (0, 6),
+        (0, 7),
+        (1, 2),
+        (1, 5),
+        (1, 7),
+        (1, 8),
+        (2, 7),
+        (3, 8),
+        (3, 9),
+        (3, 10),
+        (4, 6),
+        (4, 11),
+        (5, 6),
+        (5, 7),
+        (5, 9),
+        (5, 10),
+        (6, 7),
+    ];
+    let graph = Graph::from_edges(
+        12,
+        pairs.iter().map(|&(u, v)| Edge::new(u, v, None)).collect(),
+    );
+    let mut solver = GabowHeuristic::new(&graph);
+    let result = solver.max_cardinality_matching(&graph);
+
+    assert_eq!(result.edges.len(), 6);
+    assert!(result.is_perfect);
+    for (u, mate) in solver.mate().iter().enumerate() {
+        let v = mate.expect("perfect matching has no exposed vertices");
+        assert_eq!(solver.mate()[v], Some(u));
+        assert!(graph.edge_index(u, v).is_some());
+    }
+}
+
+#[test]
 fn gabow_matches_mv_and_fast_blossom_on_diverse_graphs() {
     let mut rng_state = 987654321_u64;
     let mut next_rand = || {

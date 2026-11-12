@@ -374,9 +374,15 @@ impl GabowHeuristic {
                 continue;
             }
 
-            // Extract path from u to root
-            let path_u = self.trace_to_root(u);
-            let path_v = self.trace_to_root(v);
+            // Earlier augmentations in this batch changed `mate`, but the BFS
+            // parent pointers still describe the matching from phase 1. Stop
+            // tracing as soon as either path enters a committed vertex.
+            let Some(path_u) = self.trace_to_root(u, &committed) else {
+                continue;
+            };
+            let Some(path_v) = self.trace_to_root(v, &committed) else {
+                continue;
+            };
 
             let root_u = *path_u.last().unwrap();
             let root_v = *path_v.last().unwrap();
@@ -457,29 +463,41 @@ impl GabowHeuristic {
     /// partner), which `mark_blossom` never modifies.  The path therefore
     /// follows the original BFS tree through the blossom interior, producing
     /// a correctly alternating path.
-    fn trace_to_root(&self, mut curr: usize) -> Vec<usize> {
+    fn trace_to_root(&self, mut curr: usize, committed: &[bool]) -> Option<Vec<usize>> {
         let mut path = vec![curr];
+        let mut seen = vec![false; self.n];
+        if committed[curr] {
+            return None;
+        }
+        seen[curr] = true;
         loop {
             // Step 1: from outer vertex, follow the MATCHED edge to inner partner.
             // In an alternating path starting at an outer vertex, the edge
             // toward the root is the matched edge.
             let partner = match self.mate[curr] {
                 Some(p) => p,
-                None => break, // curr is an exposed root — path is complete
+                None => return Some(path), // curr is an exposed root
             };
+            if committed[partner] || seen[partner] {
+                return None;
+            }
             path.push(partner);
+            seen[partner] = true;
 
             // Step 2: from inner vertex, follow p[partner] — the UNMATCHED
             // edge that originally discovered `partner` during BFS.  This
             // leads back to the next outer vertex toward the root.
             let parent = self.p[partner];
             if parent == usize::MAX {
-                break; // partner was discovered by a root directly
+                return None; // matched partner has no path to an exposed root
+            }
+            if committed[parent] || seen[parent] {
+                return None;
             }
             path.push(parent);
+            seen[parent] = true;
             curr = parent;
         }
-        path
     }
 
     pub fn augment_single_path(&mut self, graph: &Graph) -> usize {
