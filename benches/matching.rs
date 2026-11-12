@@ -230,6 +230,35 @@ fn preflight_general_weighted_solvers(graph: &Graph) -> Result<(), String> {
     )
 }
 
+/// The DPS scaling reference is integer-only and substantially more expensive
+/// than the other solvers, so it has its own small comparison range.
+fn duan_weighted_benchmarks(c: &mut Criterion) {
+    let mut group = c.benchmark_group("minimum-weight-perfect/duan-scaling");
+    group.sample_size(10);
+    for n in [8, 12, 20] {
+        let graph = generator::complete_graph(n, (1.0, 100.0));
+        let baseline = blossom_study::minimum_weight_perfect_matching(&graph);
+        let candidate = blossom_study::duan_minimum_weight_perfect_matching(&graph);
+        if let Err(error) = check_weighted_results(
+            &graph,
+            &[("primal-dual", baseline), ("duan-scaling", candidate)],
+        ) {
+            report_failed_preflight(
+                "minimum-weight-perfect/duan-scaling",
+                &format!("n={n}"),
+                error,
+            );
+            continue;
+        }
+        group.bench_with_input(BenchmarkId::new("duan-scaling", n), &graph, |b, graph| {
+            b.iter(|| {
+                require_timed_result(blossom_study::duan_minimum_weight_perfect_matching(graph))
+            })
+        });
+    }
+    group.finish();
+}
+
 fn report_failed_preflight(family: &str, parameter: &str, error: String) {
     eprintln!("[benchmark correctness failure] {family}, {parameter}: {error}; timings skipped");
 }
@@ -622,6 +651,7 @@ criterion_group!(
     cardinality_benchmarks_bipartite,
     weighted_benchmarks_dense,
     weighted_benchmarks_sparse,
+    duan_weighted_benchmarks,
     weighted_benchmarks_bipartite
 );
 criterion_main!(benches);

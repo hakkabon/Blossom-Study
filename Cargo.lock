@@ -86,13 +86,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
+name = "blossom_dsu"
+version = "0.1.0"
+
+[[package]]
 name = "blossom_study"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blossom_dsu",
  "clap",
  "criterion",
+ "duan_mwpm",
+ "gabow_matching",
  "integer-blossom",
+ "mn_matching",
  "rand",
  "rand_distr",
  "rustyline",
@@ -268,6 +276,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
+name = "duan_mwpm"
+version = "0.1.0"
+
+[[package]]
 name = "either"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -328,6 +340,13 @@ dependencies = [
  "futures-task",
  "pin-project-lite",
  "slab",
+]
+
+[[package]]
+name = "gabow_matching"
+version = "0.1.0"
+dependencies = [
+ "blossom_dsu",
 ]
 
 [[package]]
@@ -451,6 +470,13 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "mn_matching"
+version = "0.1.0"
+dependencies = [
+ "blossom_dsu",
+]
 
 [[package]]
 name = "nibble_vec"

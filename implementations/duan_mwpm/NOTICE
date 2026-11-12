@@ -1,0 +1,27 @@
+The scaling framework implemented in src/ follows:
+Ran Duan, Seth Pettie, Hsin-Hao Su. Scaling Algorithms for Weighted Matching
+in General Graphs. ACM Transactions on Algorithms 14(1), Article 8, 2018.
+DOI: https://doi.org/10.1145/3155301
+Full reference: https://arxiv.org/pdf/1411.1919v6
+
+Parts of the standard Edmonds forest tracing and nested alternating-cycle
+rotation/path lifting in src/search.rs and src/blossom.rs are adapted from
+NetworkX max_weight_matching. Its BSD-3-Clause copyright and license notices
+are retained in LICENSE. The scaling, liquidation, criteria, reweighting,
+perfection, API, and test harness integrate these into the paper's scaling
+framework. NetworkX does not implement this scaling driver.
+
+The original source repository included vendor/mwmatching-0.1.1 as a TEST-ONLY independent Edmonds/Galil solver by
+Andrew Henshaw, reimplementing Joris van Rantwijk's Python implementation.
+The upstream crate declares license MIT in its Cargo.toml. Its source header
+and metadata are retained. Rustfmt has only reformatted this vendored code;
+no algorithmic changes have been made. Upstream crate:
+https://static.crates.io/crates/mwmatching/mwmatching-0.1.1.crate
+Repository: https://github.com/ahenshaw/mwmatching
+The Blossom-Study copy does not include this vendored solver.
+The test wrapper drops negative edges for unconstrained matching and shifts
+weights when requesting maximum cardinality to avoid the old reference's
+all-negative initialization corner case. Original weights are compared.
+
+Python NetworkX is optionally used as a THIRD differential oracle by
+ tests/networkx_check.py; it is not a Rust dependency.

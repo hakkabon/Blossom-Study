@@ -88,6 +88,10 @@ fn main() {
                 "sparse-blossom",
                 blossom_study::sparse_minimum_weight_perfect_matching(graph),
             ),
+            (
+                "duan-scaling",
+                blossom_study::duan_minimum_weight_perfect_matching(graph),
+            ),
         ];
         for (algorithm, result) in results {
             match result {
@@ -128,6 +132,10 @@ fn main() {
             (
                 "sparse-blossom",
                 blossom_study::sparse_minimum_weight_perfect_matching(&graph),
+            ),
+            (
+                "duan-scaling",
+                blossom_study::duan_minimum_weight_perfect_matching(&graph),
             ),
         ];
         for (algorithm, result) in results {

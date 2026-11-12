@@ -36,6 +36,11 @@ blossom-study/
 │   └── data/               # Test graph fixtures
 ├── bench/
 │   └── main.rs             # Benchmark runner
+├── implementations/         # Focused source crates for imported algorithms
+│   ├── dsu/                # Shared union-find implementation
+│   ├── duan_mwpm/          # Scaling-based weighted solver
+│   ├── gabow_matching/     # Gabow's 2017 phased cardinality solver
+│   └── mn_matching/        # Mehlhorn–Nobahari variant
 ├── Cargo.toml
 └── README.md
 ```
@@ -46,6 +51,8 @@ blossom-study/
 - 🧪 **Gabow-inspired cardinality** (`gabow`): phased alternating search with blossom contraction and an Edmonds-style single-path search when a phase stalls. It does **not** construct the paper's tight-edge auxiliary graph $H$ or establish its $O(m\sqrt n)$ bound. An eight-vertex false-optimum regression is retained.
 - ⚠️ **Experimental Micali–Vazirani research track** (`micali-vazirani`): parity levels, bridge tenacity, DDFS proposals, and petal unrolling. Nested-petal discovery and the complete algorithm have not been independently established as complete. Recursive path and petal certificates share a fixed 100,000-state safety budget; exceeding it returns an error rather than risking an unbounded search or claiming a maximum. This is not a dependable general-purpose solver and the published MV time bound does **not** apply.
 - ✅ **Conventional Blossom Cardinality** (`fast-blossom`): Edmonds blossom contraction with timestamp-based LCA and DSU.
+- ✅ **Shared DSU**: fast blossom, the Gabow tracks, the MV petal search, and the retained Korte–Vygen reference use `implementations/dsu/`. Directed contraction keeps the requested blossom base; ordinary union reports its chosen root.
+- ✅ **Gabow-family cardinality implementations**: `gabow-weighted-approach` builds a tight-edge auxiliary graph from an Edmonds search; `mehlhorn-nobahari` uses the revised shortest-path search. Their source is kept in separate, small modules under `implementations/`.
 - ✅ **Hopcroft–Karp Bipartite Matching** (`hopcroft-karp`): $O(m \sqrt{n})$ multi-phase bipartite maximum cardinality matching.
 - ✅ **O(V³) Minimum-Weight Perfect Matching**:
   - `primal-dual`: Standard dense-matrix primal-dual baseline with exact `i128` dual arithmetic.
@@ -53,6 +60,7 @@ blossom-study/
   - `blossom-tree`: Flat-containment Blossom-Tree solver adapted from MIT-licensed `mwmatching`.
   - `cherry-tree`: Self-contained repaired Cherry-Tree primal-dual solver with recursive path lifting.
   - `sparse-blossom`: Sparse event-driven adjacency/map implementation.
+  - `duan-scaling`: integer-weight scaling implementation of Duan–Pettie–Su's Liquidationist framework. It uses simpler search/event routines than the paper, so its published runtime bound does not apply.
 - ✅ **Hungarian Bipartite Assignment**: $O(k^3)$ primal-dual shortest augmenting paths with exact cost scaling.
 - ✅ **Graph Generators & Serialization**: Complete, sparse, grid, and planted matching generators with JSON serialization.
 - ✅ **Independent exact test oracles**: registered general-cardinality solvers are checked on every simple graph through six vertices. All five weighted general-graph solvers are checked against an independent dynamic-programming oracle on reproducible sparse instances up to ten vertices, with odd, infeasible, and empty graph cases. These finite tests provide regression coverage, not a proof of correctness on arbitrary graphs.
@@ -83,6 +91,10 @@ cargo run -- max-cardinality -i graph.json
 # Experimental Gabow-inspired cardinality track
 cargo run -- --algorithm gabow max-cardinality -i graph.json
 
+# Phased Gabow-family cardinality solvers
+cargo run -- --algorithm gabow-weighted-approach max-cardinality -i graph.json
+cargo run -- --algorithm mehlhorn-nobahari max-cardinality -i graph.json
+
 # Experimental Micali–Vazirani research track (may return an error)
 cargo run -- --algorithm micali-vazirani max-cardinality -i graph.json
 
@@ -100,6 +112,9 @@ cargo run -- min-weight-perfect --solver blossom-tree -i graph.json
 
 # Repaired self-contained Cherry-Tree implementation
 cargo run -- min-weight-perfect --solver cherry-tree -i graph.json
+
+# Duan–Pettie–Su scaling study (exact integer conversion must fit i64)
+cargo run -- min-weight-perfect --solver duan-scaling -i graph.json
 ```
 
 ### Input validation
@@ -116,12 +131,16 @@ cargo run --bin bench
 cargo bench --bench matching
 ```
 
-The general-graph cardinality comparisons run `fast-blossom` and the
-`gabow-heuristic` on identical graphs, validate each returned matching, and
+The general-graph cardinality comparisons run `fast-blossom`,
+`gabow-heuristic`, `gabow-weighted-approach`, and `mehlhorn-nobahari` on identical graphs, validate each returned matching, and
 require their cardinalities to agree before displaying timings. This agreement
 is a comparison check, not an optimality proof; the dedicated small-graph
 oracle tests provide independent correctness evidence. The Gabow-inspired
 implementation is labeled as a heuristic and makes no $O(m\sqrt n)$ claim.
+The separate `duan-scaling` Criterion group uses small weighted graphs and
+checks its answer against the weighted baseline before timing. The imported
+scaling code intentionally omits the paper's fast search data structures;
+benchmark its actual runtime rather than assuming the paper's bound.
 Experimental Micali–Vazirani remains outside end-to-end comparisons; only its
 isolated level-search phase is benchmarked. Bipartite cardinality and weighted
 perfect-matching comparisons remain separate because they measure different
@@ -171,6 +190,8 @@ measurement; use Criterion's reported measurements for benchmark comparisons.
 - **`fast-blossom` — conventional Edmonds baseline.** Searches from exposed vertices, contracts odd cycles around a lowest common ancestor, and augments one path at a time. It is the simple general-graph comparator, not an MV or Gabow implementation. Literature: [Edmonds (1965)](https://doi.org/10.4153/CJM-1965-045-4); [Galil's survey (1986)](https://doi.org/10.1145/6462.6502).
 - **`micali-vazirani` — experimental MV research track, not a production solver.** Alternating parity levels and tenacity-ordered bridges feed a DDFS/petal search; certified paths are unrolled and augmented in phases. Nested-petal behavior is covered by targeted regressions, but complete correctness has not been established. Exact recursive certificate searches are capped at 100,000 explored states per solve and report `SearchBudgetExceeded` if they reach the cap. This prevents unbounded fallback work but can reject otherwise solvable inputs; it does not establish completeness or the published $O(m\sqrt n)$ bound. The generic benchmark runner excludes this solver; Criterion measures only its explicitly labeled level-search phase. Literature: [Micali–Vazirani (1980)](https://doi.org/10.1109/SFCS.1980.12); [Vazirani's proof](https://arxiv.org/abs/2012.03582).
 - **`gabow` — experimental Gabow-inspired track.** Uses a multi-root alternating search and DSU blossom contraction, then tries candidate augmenting bridges. When the phased search stalls, an Edmonds-style single-path search checks for a missed augmentation. This is **not** the algorithm of [Ansaripour, Danaei, and Mehlhorn (2024)](https://arxiv.org/abs/2409.14849): their phase one maintains dual/tight-edge information and builds an auxiliary graph $H$; phase two finds paths in $H$. No $O(m\sqrt n)$ bound is claimed for this Rust version.
+- **`gabow-weighted-approach` — phased cardinality.** The first phase runs an Edmonds primal-dual search with cardinality-encoding weights and contracts positive blossoms into a tight-edge graph $H$. The second phase finds disjoint augmenting paths in $H$, lifts them, and augments. Source: `implementations/gabow_matching/`. Literature: [Gabow (2017)](https://arxiv.org/abs/1703.03998).
+- **`mehlhorn-nobahari` — revised phased cardinality.** Replaces the first phase with the paper's direct shortest-augmenting-path search, then constructs $H$ and lifts a maximal path set. Source: `implementations/mn_matching/`. Literature: [Mehlhorn and Nobahari (2026)](https://arxiv.org/abs/2603.22909).
 
 ### Bipartite solvers
 
@@ -179,19 +200,28 @@ measurement; use Criterion's reported measurements for benchmark comparisons.
 
 ### General-graph minimum-weight perfect matching solvers
 
-All five are in-repository primal-dual blossom studies, with distinct state representations. Their measured behavior should be compared on the same graph families; a common framework does not imply identical complexity or robustness.
+These are in-repository weighted matching studies with distinct state representations. Their measured behavior should be compared on the same graph families; a common framework does not imply identical complexity or robustness.
 
 - **`primal-dual` — weighted baseline.** Uses edge-list Edmonds/Galil alternating forests, integer-scaled costs and exact `i128` dual updates. Background: [Galil (1986)](https://doi.org/10.1145/6462.6502).
 - **`blossom-engine` — independent weighted state machine.** Makes blossom creation, dual adjustments and path lifting explicit for study; it solves the same weighted matching problem through a separate implementation. Background: [Edmonds (1965)](https://doi.org/10.1145/321250.321261); [Galil (1986)](https://doi.org/10.1145/6462.6502).
 - **`blossom-tree` — flat-containment variant.** Tracks nested contractions with a flat history and maps the final mate pairs back to input edges. Its code lineage is the MIT-licensed `mwmatching` adaptation, not Blossom V. Background: [Galil (1986)](https://doi.org/10.1145/6462.6502).
 - **`cherry-tree` — ordered blossom variant.** Represents nested odd cycles as cherries and recursively lifts paths through them. This is an educational representation of weighted primal-dual matching, not a claim to a distinct published complexity bound. Background: [Edmonds (1965)](https://doi.org/10.1145/321250.321261).
 - **`sparse-blossom` — event-driven sparse experiment.** Uses incident-edge maps rather than a dense weight matrix, while retaining weighted blossom/dual operations. Its amortized bound is not proved here. Background: [Kolmogorov's Blossom V paper (2009)](https://pub.ista.ac.at/~vnk/papers/blossom5.pdf) for a contrasting mature weighted implementation.
+- **`duan-scaling` — Liquidationist integer scaling study.** Carries duals and inherited blossoms across bits, liquidates blossoms, and uses SearchOne before final perfection. The source preserves its BSD notice and implementation notes in `implementations/duan_mwpm/`. It omits the specialized data structures needed for the paper's $O(m\sqrt n\log(nN))$ bound. The adapter preserves exact costs only if a common binary scaling fits signed 64-bit integers; otherwise it reports an error. Literature: [Duan, Pettie, and Su (2017)](https://arxiv.org/abs/1411.1919).
+
+The `duan-scaling` benchmark adapter disables the solver's expensive internal
+invariant scans, then validates the final matching and checks its weight
+against the baseline before timing. The imported crate's own tests exercise
+the internal checks.
 
 ---
 
 ## References
 
 - Ansaripour, M., Danaei, A., & Mehlhorn, K. (2024). *Gabow's Cardinality Matching Algorithm in General Graphs: Implementation and Experiments*. arXiv:2409.14849 [cs.DS].
+- Gabow, H. N. (2017). *The Weighted Matching Approach to Maximum Cardinality Matching*. arXiv:1703.03998.
+- Mehlhorn, K., & Nobahari, R. (2026). *Gabow's O(√nm) Maximum Cardinality Matching Algorithm, Revisited*. arXiv:2603.22909v2.
+- Duan, R., Pettie, S., & Su, H.-H. (2017). *Scaling Algorithms for Weighted Matching in General Graphs*. arXiv:1411.1919v6.
 - Gabow, H.N. (2017). *Data Structures for Weighted Matching and Extensions to b-matching*. arXiv:1611.07541.
 - Micali, S., & Vazirani, V.V. (1980). An $O(\sqrt{|V|} \cdot |E|)$ algorithm for finding maximum matching in general graphs. *21st Annual Symposium on Foundations of Computer Science (FOCS 1980)*, 17–27.
 - Hopcroft, J.E., & Karp, R.M. (1973). An $n^{5/2}$ algorithm for maximum matchings in bipartite graphs. *SIAM Journal on Computing*, 2(4), 225–231.

@@ -31,48 +31,7 @@ use crate::graph::Graph;
 use std::collections::VecDeque;
 use std::time::Instant;
 
-/// Disjoint-Set Union (DSU) structure for blossom contraction with path compression.
-#[derive(Clone, Debug)]
-pub struct Dsu {
-    parent: Vec<usize>,
-}
-
-impl Dsu {
-    pub fn new(n: usize) -> Self {
-        Self {
-            parent: (0..n).collect(),
-        }
-    }
-
-    pub fn reset(&mut self) {
-        for i in 0..self.parent.len() {
-            self.parent[i] = i;
-        }
-    }
-
-    #[inline]
-    pub fn find(&mut self, mut i: usize) -> usize {
-        let mut root = i;
-        while root != self.parent[root] {
-            root = self.parent[root];
-        }
-        while i != root {
-            let next = self.parent[i];
-            self.parent[i] = root;
-            i = next;
-        }
-        root
-    }
-
-    #[inline]
-    pub fn union_sets(&mut self, child: usize, parent: usize) {
-        let root_child = self.find(child);
-        let root_parent = self.find(parent);
-        if root_child != root_parent {
-            self.parent[root_child] = root_parent;
-        }
-    }
-}
+pub use blossom_dsu::UnionFind as Dsu;
 
 /// Experimental phased cardinality solver inspired by Gabow's algorithm.
 #[derive(Clone, Debug)]
@@ -199,7 +158,7 @@ impl GabowCardinality {
     // =========================================================================
 
     pub fn phase1_search(&mut self, graph: &Graph) -> (Option<usize>, Vec<(usize, usize, usize)>) {
-        self.dsu.reset();
+        self.dsu.reset(self.n);
         self.level.fill(usize::MAX);
         self.label.fill(-1);
         self.p.fill(usize::MAX);
@@ -356,8 +315,8 @@ impl GabowCardinality {
             self.p[v] = u;
             self.orig_p[v] = u;
 
-            self.dsu.union_sets(v, b);
-            self.dsu.union_sets(u_next, b);
+            self.dsu.union_into(v, b);
+            self.dsu.union_into(u_next, b);
 
             u = u_next;
             v = self.orig_p[u_next];
@@ -491,7 +450,7 @@ impl GabowCardinality {
     }
 
     pub fn augment_single_path(&mut self, graph: &Graph) -> usize {
-        self.dsu.reset();
+        self.dsu.reset(self.n);
         self.label.fill(-1);
         self.p.fill(usize::MAX);
         self.orig_p.fill(usize::MAX);
@@ -504,7 +463,7 @@ impl GabowCardinality {
                 self.label.fill(-1);
                 self.p.fill(usize::MAX);
                 self.orig_p.fill(usize::MAX);
-                self.dsu.reset();
+                self.dsu.reset(self.n);
 
                 q.clear();
                 q.push_back(i);

@@ -50,6 +50,7 @@
 
 use crate::algorithms::{MatchingMetadata, MatchingResult};
 use crate::graph::Graph;
+use blossom_dsu::UnionFind;
 use std::cell::Cell;
 use std::collections::VecDeque;
 use std::fmt;
@@ -280,7 +281,7 @@ pub struct MicaliVazirani {
     /// Directed predecessor edges entering a vertex in the alternating layered DAG.
     predecessor: Vec<Vec<usize>>,
     /// Disjoint-set union tracking blossom bases (super-vertices).
-    petal_base: Vec<usize>,
+    petal_base: UnionFind,
     /// Bridges collected during level search.
     bridges: Vec<usize>,
     level_search_scans: usize,
@@ -325,7 +326,7 @@ impl MicaliVazirani {
             min_level: vec![None; n],
             max_level: vec![None; n],
             predecessor: vec![Vec::new(); n],
-            petal_base: (0..n).collect(),
+            petal_base: UnionFind::new(n),
             bridges: Vec::new(),
             level_search_scans: 0,
             ddfs_epoch: 0,
@@ -1319,24 +1320,15 @@ impl MicaliVazirani {
         }
     }
 
-    pub fn find_petal_base(&mut self, mut v: usize) -> usize {
-        let mut root = v;
-        while root != self.petal_base[root] {
-            root = self.petal_base[root];
-        }
-        while v != root {
-            let next = self.petal_base[v];
-            self.petal_base[v] = root;
-            v = next;
-        }
-        root
+    pub fn find_petal_base(&mut self, v: usize) -> usize {
+        self.petal_base.find(v)
     }
 
     pub fn union_petal(&mut self, base: usize, cycle_vertices: &[usize]) {
         let root_base = self.find_petal_base(base);
         for &v in cycle_vertices {
             let root_v = self.find_petal_base(v);
-            self.petal_base[root_v] = root_base;
+            self.petal_base.union_into(root_v, root_base);
         }
     }
 
@@ -1971,10 +1963,7 @@ impl MicaliVazirani {
         self.min_level.fill(None);
         self.max_level.fill(None);
         self.predecessor.iter_mut().for_each(Vec::clear);
-        self.petal_base
-            .iter_mut()
-            .enumerate()
-            .for_each(|(v, base)| *base = v);
+        self.petal_base.reset(self.vertex_count);
         self.bridges.clear();
         self.level_search_scans = 0;
         self.ddfs_epoch = 0;

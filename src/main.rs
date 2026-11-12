@@ -14,6 +14,10 @@ pub enum Algorithm {
     MicaliVazirani,
     /// Gabow-inspired heuristic phased cardinality solver (correct but no O(m√n) guarantee)
     Gabow,
+    /// Gabow's 2017 weighted matching approach to cardinality
+    GabowWeightedApproach,
+    /// Mehlhorn–Nobahari revision of Gabow's phased algorithm
+    MehlhornNobahari,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -28,6 +32,8 @@ pub enum WeightedAlgorithm {
     BlossomTree,
     /// Self-contained repaired Cherry-Tree primal-dual implementation
     CherryTree,
+    /// Duan–Pettie–Su scaling reference (integer edge weights)
+    DuanScaling,
 }
 
 impl WeightedAlgorithm {
@@ -43,6 +49,7 @@ impl WeightedAlgorithm {
             Self::SparseBlossom => algorithms::sparse_minimum_weight_perfect_matching(graph),
             Self::BlossomTree => algorithms::blossom_tree_minimum_weight_perfect_matching(graph),
             Self::CherryTree => algorithms::cherry_tree_minimum_weight_perfect_matching(graph),
+            Self::DuanScaling => algorithms::duan_minimum_weight_perfect_matching(graph),
         }
     }
 }
@@ -61,6 +68,18 @@ impl Algorithm {
                 .map_err(|error| error.to_string()),
             Algorithm::Gabow => {
                 algorithms::general_cardinality::solve_general_cardinality("gabow-heuristic", graph)
+            }
+            Algorithm::GabowWeightedApproach => {
+                algorithms::general_cardinality::solve_general_cardinality(
+                    "gabow-weighted-approach",
+                    graph,
+                )
+            }
+            Algorithm::MehlhornNobahari => {
+                algorithms::general_cardinality::solve_general_cardinality(
+                    "mehlhorn-nobahari",
+                    graph,
+                )
             }
         }
     }
@@ -330,6 +349,16 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
                                 "gabow-heuristic",
                                 Algorithm::Gabow.max_cardinality(&graph),
                             ),
+                            "gabow-weighted-approach" | "gabow_weighted_approach" => (
+                                "maximum-cardinality",
+                                "gabow-weighted-approach",
+                                Algorithm::GabowWeightedApproach.max_cardinality(&graph),
+                            ),
+                            "mehlhorn-nobahari" | "mehlhorn_nobahari" | "mn" => (
+                                "maximum-cardinality",
+                                "mehlhorn-nobahari",
+                                Algorithm::MehlhornNobahari.max_cardinality(&graph),
+                            ),
                             "micali_vazirani" | "mv" => {
                                 eprintln!(
                                     "Skipping {algo_name}: Micali–Vazirani is experimental and excluded from the generic end-to-end benchmark."
@@ -340,6 +369,11 @@ fn run_benchmarks(config_path: Option<String>, output_dir: &str) -> Result<()> {
                                 "minimum-weight-perfect",
                                 "primal-dual",
                                 WeightedAlgorithm::PrimalDual.min_weight_perfect(&graph),
+                            ),
+                            "duan-scaling" | "duan_scaling" | "duan" => (
+                                "minimum-weight-perfect",
+                                "duan-scaling",
+                                WeightedAlgorithm::DuanScaling.min_weight_perfect(&graph),
                             ),
                             "blossom_engine" | "blossom-engine" => (
                                 "minimum-weight-perfect",
@@ -543,7 +577,9 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
     println!(
         "Commands: load <file>, max, min, graph, edges, result, save <file>, algo <name>, quit"
     );
-    println!("Algorithms: fast_blossom, micali_vazirani (experimental; may return an error)");
+    println!(
+        "Cardinality algorithms: fast_blossom, gabow, gabow_weighted_approach, mehlhorn_nobahari, micali_vazirani (experimental)"
+    );
     println!("File formats: JSON (.json), DIMACS (.dimacs, .dat, .txt)");
     println!();
 
@@ -565,7 +601,9 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                 match parts[0] {
                     "algo" | "algorithm" => {
                         if parts.len() < 2 {
-                            println!("Usage: algo <fast_blossom|micali_vazirani>");
+                            println!(
+                                "Usage: algo <fast_blossom|gabow|gabow_weighted_approach|mehlhorn_nobahari|micali_vazirani>"
+                            );
                             println!("Current: {:?}", current_algorithm);
                             continue;
                         }
@@ -574,9 +612,16 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                             "mv" | "micali_vazirani" | "micali-vazirani" => {
                                 Algorithm::MicaliVazirani
                             }
+                            "gabow" | "gabow_heuristic" | "gabow-heuristic" => Algorithm::Gabow,
+                            "gabow_weighted_approach" | "gabow-weighted-approach" => {
+                                Algorithm::GabowWeightedApproach
+                            }
+                            "mn" | "mehlhorn_nobahari" | "mehlhorn-nobahari" => {
+                                Algorithm::MehlhornNobahari
+                            }
                             _ => {
                                 println!(
-                                    "Unknown algorithm: {}. Use 'fast_blossom' or 'micali_vazirani'",
+                                    "Unknown algorithm: {}. Use 'fast_blossom', 'gabow', 'gabow_weighted_approach', 'mehlhorn_nobahari', or 'micali_vazirani'",
                                     parts[1]
                                 );
                                 continue;
@@ -648,9 +693,17 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                                 {
                                     WeightedAlgorithm::CherryTree
                                 }
+                                Some(name)
+                                    if matches!(
+                                        name.as_str(),
+                                        "duan-scaling" | "duan_scaling" | "duan"
+                                    ) =>
+                                {
+                                    WeightedAlgorithm::DuanScaling
+                                }
                                 Some(name) => {
                                     println!(
-                                        "Unknown weighted solver: {name}. Use 'primal-dual', 'blossom-engine', 'sparse-blossom', 'blossom-tree', or 'cherry-tree'"
+                                        "Unknown weighted solver: {name}. Use 'primal-dual', 'blossom-engine', 'sparse-blossom', 'blossom-tree', 'cherry-tree', or 'duan-scaling'"
                                     );
                                     continue;
                                 }

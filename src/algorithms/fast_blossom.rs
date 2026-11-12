@@ -27,44 +27,7 @@ use crate::graph::Graph;
 use std::collections::VecDeque;
 use std::time::Instant;
 
-/// Union-Find (Disjoint Set Union) with path compression
-#[derive(Clone, Debug)]
-struct Dsu {
-    parent: Vec<usize>,
-}
-
-impl Dsu {
-    fn new(n: usize) -> Self {
-        Self {
-            parent: (0..n).collect(),
-        }
-    }
-
-    fn reset(&mut self) {
-        for i in 0..self.parent.len() {
-            self.parent[i] = i;
-        }
-    }
-
-    /// Finds the representative (blossom root) with path compression
-    fn find(&mut self, i: usize) -> usize {
-        if self.parent[i] == i {
-            i
-        } else {
-            self.parent[i] = self.find(self.parent[i]);
-            self.parent[i]
-        }
-    }
-
-    /// Merges child blossom into the parent blossom root
-    fn union_sets(&mut self, child: usize, parent: usize) {
-        let root_child = self.find(child);
-        let root_parent = self.find(parent);
-        if root_child != root_parent {
-            self.parent[root_child] = root_parent;
-        }
-    }
-}
+use blossom_dsu::UnionFind as Dsu;
 
 /// Fast Blossom Matching Algorithm
 ///
@@ -162,8 +125,8 @@ impl FastBlossomMatching {
             self.orig_p[v] = u;
 
             // Union both endpoints of the matched edge into the LCA base
-            self.dsu.union_sets(v, b);
-            self.dsu.union_sets(u_next, b);
+            self.dsu.union_into(v, b);
+            self.dsu.union_into(u_next, b);
 
             // Backtrack via the parent pointer of the matched pair
             v = self.orig_p[u_next];
@@ -174,7 +137,7 @@ impl FastBlossomMatching {
         self.label.fill(-1);
         self.p.fill(usize::MAX);
         self.orig_p.fill(usize::MAX);
-        self.dsu.reset();
+        self.dsu.reset(self.n);
 
         q.clear();
         q.push_back(root);

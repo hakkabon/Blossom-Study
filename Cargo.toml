@@ -17,6 +17,10 @@ clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 integer-blossom = "1.2.1"
 rustyline = "13.0"
+blossom_dsu = { path = "implementations/dsu" }
+duan_mwpm = { path = "implementations/duan_mwpm" }
+gabow_matching = { path = "implementations/gabow_matching" }
+mn_matching = { path = "implementations/mn_matching" }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

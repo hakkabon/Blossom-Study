@@ -34,6 +34,16 @@ pub const GENERAL_CARDINALITY_SOLVERS: &[GeneralCardinalitySolver] = &[
         role: "Gabow-inspired heuristic; no O(m sqrt(n)) guarantee",
         solve: algorithms::gabow_heuristic_matching,
     },
+    GeneralCardinalitySolver {
+        name: "gabow-weighted-approach",
+        role: "Gabow 2017 phased cardinality implementation",
+        solve: algorithms::gabow_maximum_cardinality_matching,
+    },
+    GeneralCardinalitySolver {
+        name: "mehlhorn-nobahari",
+        role: "Revised Gabow shortest-path phase implementation",
+        solve: algorithms::mn_maximum_cardinality_matching,
+    },
 ];
 
 /// Run a registered solver by its stable comparison label.

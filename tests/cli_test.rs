@@ -28,6 +28,16 @@ fn documented_cli_workflow_succeeds() {
     );
     assert!(String::from_utf8_lossy(&cardinality.stdout).contains("is_perfect=true"));
 
+    for solver in ["gabow-weighted-approach", "mehlhorn-nobahari"] {
+        let output = run(&["--algorithm", solver, "max-cardinality", "-i", graph_path]);
+        assert!(
+            output.status.success(),
+            "solver {solver}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("is_perfect=true"));
+    }
+
     let experimental_mv = run(&[
         "--algorithm",
         "micali-vazirani",
@@ -68,7 +78,12 @@ fn documented_cli_workflow_succeeds() {
     );
     assert!(String::from_utf8_lossy(&blossom_engine.stdout).contains("is_perfect=true"));
 
-    for solver in ["sparse-blossom", "blossom-tree", "cherry-tree"] {
+    for solver in [
+        "sparse-blossom",
+        "blossom-tree",
+        "cherry-tree",
+        "duan-scaling",
+    ] {
         let output = run(&["min-weight-perfect", "--solver", solver, "-i", graph_path]);
         assert!(
             output.status.success(),
@@ -79,6 +94,64 @@ fn documented_cli_workflow_succeeds() {
     }
 
     std::fs::remove_file(graph_path).expect("temporary graph should be removable");
+}
+
+#[test]
+fn generic_benchmark_runner_includes_imported_solvers() {
+    let temp_root = std::env::temp_dir().join(format!(
+        "blossom-study-imported-benchmark-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir(&temp_root).unwrap();
+    let config_path = temp_root.join("config.json");
+    let output_path = temp_root.join("results");
+    std::fs::write(
+        &config_path,
+        r#"{
+            "graph_sizes": [4],
+            "densities": [1.0],
+            "weight_ranges": [[1.0, 2.0]],
+            "runs_per_config": 1,
+            "seed": 17,
+            "algorithms": ["fast_blossom", "gabow-weighted-approach", "mehlhorn-nobahari", "primal-dual", "duan-scaling"]
+        }"#,
+    )
+    .unwrap();
+    let output = run(&[
+        "bench",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--output",
+        output_path.to_str().unwrap(),
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let records: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(output_path.join("bench_results.json")).unwrap(),
+    )
+    .unwrap();
+    let names: std::collections::BTreeSet<_> = records
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|record| record["algorithm"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "fast-blossom",
+            "gabow-weighted-approach",
+            "mehlhorn-nobahari",
+            "primal-dual",
+            "duan-scaling"
+        ]
+        .into_iter()
+        .collect()
+    );
+    std::fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]

@@ -25,7 +25,12 @@ fn general_cardinality_registry_compares_named_solvers_on_the_same_graph() {
             .iter()
             .map(|entry| entry.solver.name)
             .collect::<Vec<_>>(),
-        ["fast-blossom", "gabow-heuristic"]
+        [
+            "fast-blossom",
+            "gabow-heuristic",
+            "gabow-weighted-approach",
+            "mehlhorn-nobahari"
+        ]
     );
     assert_eq!(results[0].result.edges.len(), 3);
     for entry in results {

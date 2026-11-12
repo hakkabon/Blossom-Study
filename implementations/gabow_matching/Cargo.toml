@@ -1,0 +1,7 @@
+[package]
+name = "gabow_matching"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+blossom_dsu = { path = "../dsu" }

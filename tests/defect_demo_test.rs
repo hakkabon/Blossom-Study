@@ -1,18 +1,16 @@
-//! Focused tests demonstrating specific defects in Gabow's trace_to_root.
+//! Historical trace-to-root regressions for the experimental Gabow track.
 
 use blossom_study::{Edge, GabowCardinality, Graph};
 
-/// Defect 1: trace_to_root cannot trace non-root outer vertices.
+/// Former defect 1: trace_to_root could not trace non-root outer vertices.
 ///
 /// Graph: 0 - 1 = 2 - 3 (path of 4 vertices, {1,2} matched, 0 and 3 exposed)
 /// Augmenting path: 0 - 1 = 2 - 3 (length 3)
 ///
 /// Phase 1 finds the bridge (2,3) with path length 3.
-/// Phase 2 FAILS because trace_to_root(2) returns [2] (p[2] = MAX,
-/// since p is only set for inner vertices, not outer vertices).
-/// The "root" is 2, which is matched (mate[2]=1), so the bridge is skipped.
+/// Phase 2 must now trace the length-three alternating path.
 #[test]
-fn gabow_phase2_fails_on_length3_path() {
+fn gabow_phase2_augments_length3_path() {
     let graph = Graph::from_edges(
         4,
         vec![
@@ -30,8 +28,12 @@ fn gabow_phase2_fails_on_length3_path() {
 
     let aug_count = solver.phase2_augment(&graph, 3, &bridges);
     assert_eq!(
-        aug_count, 0,
-        "Phase 2 fails: trace_to_root(2) = [2] because p[2]=MAX"
+        aug_count, 1,
+        "Phase 2 should trace the non-root outer vertex"
+    );
+    assert_eq!(
+        solver.mate().iter().filter(|mate| mate.is_some()).count(),
+        4
     );
 }
 
@@ -43,20 +45,20 @@ fn gabow_phase2_works_for_length1() {
     let (len, bridges) = solver.phase1_search(&graph);
     assert_eq!(len, Some(1));
     let aug = solver.phase2_augment(&graph, 1, &bridges);
-    assert_eq!(aug, 1, "Phase 2 works for length-1 (both endpoints are roots)");
+    assert_eq!(
+        aug, 1,
+        "Phase 2 works for length-1 (both endpoints are roots)"
+    );
 }
 
-/// Defect 2: trace_to_root produces invalid alternating paths through blossoms.
+/// Former defect 2: trace_to_root produced invalid alternating paths through blossoms.
 ///
 /// Triangle 0-1-2-0 plus edge 0-3, matching {0,1}, exposed {2,3}.
 /// Augmenting path: 3-0=1-2 (length 3: unmatched, matched, unmatched).
 ///
-/// After blossom on {0,1,2} with base 2:
-/// p[0] = 2 (set by mark_blossom to bridge endpoint)
-/// trace_to_root(0) = [0, 2] using direct unmatched edge (0,2)
-/// Full path [2, 0, 3] has (2,0) unmatched, (0,3) unmatched — NOT alternating.
+/// Phase 2 must include the blossom interior when it augments.
 #[test]
-fn gabow_trace_to_root_skips_blossom_interior() {
+fn gabow_trace_to_root_lifts_blossom_interior() {
     let graph = Graph::from_edges(
         4,
         vec![
@@ -73,11 +75,13 @@ fn gabow_trace_to_root_skips_blossom_interior() {
 
     if let Some(target_len) = shortest_len {
         let aug_count = solver.phase2_augment(&graph, target_len, &bridges);
-        // Phase 2 fails because the traced path through the blossom
-        // has two consecutive unmatched edges (non-alternating).
         assert_eq!(
-            aug_count, 0,
-            "Phase 2 fails: trace_to_root skips blossom interior"
+            aug_count, 1,
+            "Phase 2 should lift a valid alternating path through the blossom"
+        );
+        assert_eq!(
+            solver.mate().iter().filter(|mate| mate.is_some()).count(),
+            4
         );
     }
 }

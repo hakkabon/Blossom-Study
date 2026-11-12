@@ -24,9 +24,9 @@
 //!    - Edge to an outer vertex in the same tree: **Shrinks** the odd cycle into a blossom
 //!      by uniting bases in $\rho$ and closing the $\phi$ pointer cycle (converting the path into an ear).
 
-use crate::algorithms::union_find::UnionFind;
 use crate::algorithms::{MatchingMetadata, MatchingResult};
 use crate::graph::Graph;
+use blossom_dsu::UnionFind;
 use std::collections::VecDeque;
 use std::time::Instant;
 
@@ -83,7 +83,7 @@ impl<'a> KorteVygenEdmonds<'a> {
             scanned: vec![false; n],
             tree: vec![0; n],
             forest: vec![Vec::new(); n],
-            rho: UnionFind::new(),
+            rho: UnionFind::new(0),
             n,
             iterations: 0,
             blossoms_created: 0,
