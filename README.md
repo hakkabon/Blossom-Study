@@ -64,6 +64,7 @@ blossom-study/
 - ✅ **Hungarian Bipartite Assignment**: $O(k^3)$ primal-dual shortest augmenting paths with exact cost scaling.
 - ✅ **Graph Generators & Serialization**: Complete, sparse, grid, and planted matching generators with JSON serialization.
 - ✅ **Independent exact test oracles**: registered general-cardinality solvers are checked on every simple graph through six vertices. The three general weighted solvers in the shared oracle suite are checked against dynamic programming on reproducible sparse instances up to ten vertices; Duan scaling has a separate exhaustive small-graph test. Retired solvers' defect graphs remain in `weighted_regressions_test.rs`. These finite tests provide regression coverage, not a proof of correctness on arbitrary graphs.
+- ✅ **Larger deterministic differential suite**: seeded general, weighted, infeasible, and bipartite cases run through the comparable solvers up to 40 vertices. Smaller cases in this suite have independent subset-DP checks; larger cases check validity and cross-solver agreement. Failures produce edge-reduced, replayable JSON artifacts. See [test coverage and failure records](tests/DIFFERENTIAL.md).
 
 ### Performance interpretation
 
