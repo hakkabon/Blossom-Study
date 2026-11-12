@@ -1,0 +1,21 @@
+{
+  "kind": "seeded-cli-smoke-run",
+  "date": "2026-11-12",
+  "source_commit": "b8ebd521be787cd1bc5d6c7a6dbbfc3e5fbd3a6e",
+  "source_changes_during_run": "none; documentation and benchmark config were uncommitted",
+  "cargo_lock_sha256": "3f746bef5f97d525a0e0dbef60b3af18b5c53317ad3d52ab43cab05d09f9aea8",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+  "platform": "macOS 15.7.4, x86_64",
+  "profile": "release (opt-level=3, thin LTO, codegen-units=1)",
+  "command": "cargo run --release --offline --bin blossom_study -- bench --config bench/records/2026-11-12-smoke/config.json --output bench/records/2026-11-12-smoke",
+  "config": "config.json",
+  "results": "bench_results.json",
+  "timing_kind": "single solver-internal wall-clock measurement per row; exploratory only",
+  "expected_graphs": 8,
+  "solvers_per_graph": 8,
+  "result_rows": 64,
+  "skipped_solver_graph_pairs": 0,
+  "all_recorded_matchings_perfect": true,
+  "all_recorded_weighted_results_agree_per_graph": true
+}

@@ -1,0 +1,2434 @@
+[
+  {
+    "algorithm": "fast-blossom",
+    "density": 0.5,
+    "graph_signature": "ed6626a05ab32104",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 98.63837292577003,
+    "observed_weight_min": 3.420535552201217,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        1,
+        7,
+        9,
+        25,
+        3,
+        15
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 2,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 6,
+        "runtime_ms": 0.017198
+      },
+      "total_weight": 377.5310742636238
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-heuristic",
+    "density": 0.5,
+    "graph_signature": "ed6626a05ab32104",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 98.63837292577003,
+    "observed_weight_min": 3.420535552201217,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        1,
+        7,
+        9,
+        25,
+        3,
+        15
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.020958
+      },
+      "total_weight": 377.5310742636238
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-weighted-approach",
+    "density": 0.5,
+    "graph_signature": "ed6626a05ab32104",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 98.63837292577003,
+    "observed_weight_min": 3.420535552201217,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        4,
+        9,
+        25,
+        3,
+        27,
+        30
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.737957
+      },
+      "total_weight": 402.4738870061119
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "mehlhorn-nobahari",
+    "density": 0.5,
+    "graph_signature": "ed6626a05ab32104",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 98.63837292577003,
+    "observed_weight_min": 3.420535552201217,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        4,
+        9,
+        25,
+        3,
+        27,
+        30
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.815458
+      },
+      "total_weight": 402.4738870061119
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "primal-dual",
+    "density": 0.5,
+    "graph_signature": "ed6626a05ab32104",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 98.63837292577003,
+    "observed_weight_min": 3.420535552201217,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        3,
+        4,
+        6,
+        8,
+        15,
+        24
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 0,
+        "runtime_ms": 0.49907300000000004
+      },
+      "total_weight": 236.80942196395523
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "blossom-engine",
+    "density": 0.5,
+    "graph_signature": "ed6626a05ab32104",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 98.63837292577003,
+    "observed_weight_min": 3.420535552201217,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        3,
+        4,
+        6,
+        8,
+        15,
+        24
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 2,
+        "blossoms_expanded": 0,
+        "dual_updates": 14,
+        "iterations": 559,
+        "runtime_ms": 0.163863
+      },
+      "total_weight": 236.80942196395523
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "sparse-blossom",
+    "density": 0.5,
+    "graph_signature": "ed6626a05ab32104",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 98.63837292577003,
+    "observed_weight_min": 3.420535552201217,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        3,
+        4,
+        6,
+        8,
+        15,
+        24
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 2,
+        "blossoms_expanded": 0,
+        "dual_updates": 14,
+        "iterations": 47,
+        "runtime_ms": 0.068049
+      },
+      "total_weight": 236.80942196395523
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "duan-scaling",
+    "density": 0.5,
+    "graph_signature": "ed6626a05ab32104",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 98.63837292577003,
+    "observed_weight_min": 3.420535552201217,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        3,
+        4,
+        6,
+        8,
+        15,
+        24
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 358,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 244,
+        "iterations": 61,
+        "runtime_ms": 1.803616
+      },
+      "total_weight": 236.80942196395523
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "fast-blossom",
+    "density": 0.5,
+    "graph_signature": "63b50829362a1845",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 96.93439258682601,
+    "observed_weight_min": 2.1120183164671738,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        3,
+        7,
+        1,
+        2,
+        18,
+        21
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 6,
+        "runtime_ms": 0.00943
+      },
+      "total_weight": 340.2944117842147
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-heuristic",
+    "density": 0.5,
+    "graph_signature": "63b50829362a1845",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 96.93439258682601,
+    "observed_weight_min": 2.1120183164671738,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        3,
+        7,
+        1,
+        2,
+        18,
+        21
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.011041
+      },
+      "total_weight": 340.2944117842147
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-weighted-approach",
+    "density": 0.5,
+    "graph_signature": "63b50829362a1845",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 96.93439258682601,
+    "observed_weight_min": 2.1120183164671738,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        23,
+        7,
+        8,
+        14,
+        10,
+        12
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.232836
+      },
+      "total_weight": 304.1008301406278
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "mehlhorn-nobahari",
+    "density": 0.5,
+    "graph_signature": "63b50829362a1845",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 96.93439258682601,
+    "observed_weight_min": 2.1120183164671738,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        23,
+        7,
+        8,
+        14,
+        10,
+        12
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.166702
+      },
+      "total_weight": 304.1008301406278
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "primal-dual",
+    "density": 0.5,
+    "graph_signature": "63b50829362a1845",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 96.93439258682601,
+    "observed_weight_min": 2.1120183164671738,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        3,
+        8,
+        9,
+        13,
+        27,
+        32
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 0,
+        "runtime_ms": 0.024556
+      },
+      "total_weight": 204.42206792480525
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "blossom-engine",
+    "density": 0.5,
+    "graph_signature": "63b50829362a1845",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 96.93439258682601,
+    "observed_weight_min": 2.1120183164671738,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        3,
+        8,
+        9,
+        13,
+        27,
+        32
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 1,
+        "blossoms_expanded": 0,
+        "dual_updates": 12,
+        "iterations": 485,
+        "runtime_ms": 0.042614
+      },
+      "total_weight": 204.42206792480525
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "sparse-blossom",
+    "density": 0.5,
+    "graph_signature": "63b50829362a1845",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 96.93439258682601,
+    "observed_weight_min": 2.1120183164671738,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        3,
+        8,
+        9,
+        13,
+        27,
+        32
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 1,
+        "blossoms_expanded": 0,
+        "dual_updates": 12,
+        "iterations": 41,
+        "runtime_ms": 0.031603
+      },
+      "total_weight": 204.42206792480525
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "duan-scaling",
+    "density": 0.5,
+    "graph_signature": "63b50829362a1845",
+    "m": 33,
+    "n": 12,
+    "observed_weight_max": 96.93439258682601,
+    "observed_weight_min": 2.1120183164671738,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        3,
+        8,
+        9,
+        13,
+        27,
+        32
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 298,
+        "blossoms_created": 2,
+        "blossoms_expanded": 0,
+        "dual_updates": 252,
+        "iterations": 61,
+        "runtime_ms": 2.5077670000000003
+      },
+      "total_weight": 204.42206792480525
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "fast-blossom",
+    "density": 1.0,
+    "graph_signature": "548c71743ca0c87d",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 93.58060147868353,
+    "observed_weight_min": 4.652875219381131,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        21,
+        38,
+        51,
+        60,
+        65
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 15,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 6,
+        "runtime_ms": 0.030685
+      },
+      "total_weight": 406.1785764327129
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-heuristic",
+    "density": 1.0,
+    "graph_signature": "548c71743ca0c87d",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 93.58060147868353,
+    "observed_weight_min": 4.652875219381131,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        21,
+        38,
+        51,
+        60,
+        65
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.012785000000000001
+      },
+      "total_weight": 406.1785764327129
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-weighted-approach",
+    "density": 1.0,
+    "graph_signature": "548c71743ca0c87d",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 93.58060147868353,
+    "observed_weight_min": 4.652875219381131,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        21,
+        38,
+        51,
+        60,
+        65
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.117599
+      },
+      "total_weight": 406.1785764327129
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "mehlhorn-nobahari",
+    "density": 1.0,
+    "graph_signature": "548c71743ca0c87d",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 93.58060147868353,
+    "observed_weight_min": 4.652875219381131,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        21,
+        38,
+        51,
+        60,
+        65
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.119134
+      },
+      "total_weight": 406.1785764327129
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "primal-dual",
+    "density": 1.0,
+    "graph_signature": "548c71743ca0c87d",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 93.58060147868353,
+    "observed_weight_min": 4.652875219381131,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        1,
+        12,
+        41,
+        48,
+        54,
+        59
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 0,
+        "runtime_ms": 0.018871
+      },
+      "total_weight": 83.79518132133093
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "blossom-engine",
+    "density": 1.0,
+    "graph_signature": "548c71743ca0c87d",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 93.58060147868353,
+    "observed_weight_min": 4.652875219381131,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        1,
+        12,
+        41,
+        48,
+        54,
+        59
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 9,
+        "iterations": 503,
+        "runtime_ms": 0.039909
+      },
+      "total_weight": 83.79518132133093
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "sparse-blossom",
+    "density": 1.0,
+    "graph_signature": "548c71743ca0c87d",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 93.58060147868353,
+    "observed_weight_min": 4.652875219381131,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        1,
+        12,
+        41,
+        48,
+        54,
+        59
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 9,
+        "iterations": 42,
+        "runtime_ms": 0.036823
+      },
+      "total_weight": 83.79518132133093
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "duan-scaling",
+    "density": 1.0,
+    "graph_signature": "548c71743ca0c87d",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 93.58060147868353,
+    "observed_weight_min": 4.652875219381131,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        1,
+        12,
+        41,
+        48,
+        54,
+        59
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 354,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 240,
+        "iterations": 60,
+        "runtime_ms": 1.764797
+      },
+      "total_weight": 83.79518132133093
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "fast-blossom",
+    "density": 1.0,
+    "graph_signature": "cbc2b9169ebfae17",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 99.29682953605757,
+    "observed_weight_min": 2.143956691032704,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        21,
+        38,
+        51,
+        60,
+        65
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 15,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 6,
+        "runtime_ms": 0.009445
+      },
+      "total_weight": 221.25628126932307
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-heuristic",
+    "density": 1.0,
+    "graph_signature": "cbc2b9169ebfae17",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 99.29682953605757,
+    "observed_weight_min": 2.143956691032704,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        21,
+        38,
+        51,
+        60,
+        65
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.013061000000000001
+      },
+      "total_weight": 221.25628126932307
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-weighted-approach",
+    "density": 1.0,
+    "graph_signature": "cbc2b9169ebfae17",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 99.29682953605757,
+    "observed_weight_min": 2.143956691032704,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        21,
+        38,
+        51,
+        60,
+        65
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.127213
+      },
+      "total_weight": 221.25628126932307
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "mehlhorn-nobahari",
+    "density": 1.0,
+    "graph_signature": "cbc2b9169ebfae17",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 99.29682953605757,
+    "observed_weight_min": 2.143956691032704,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        21,
+        38,
+        51,
+        60,
+        65
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.109638
+      },
+      "total_weight": 221.25628126932307
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "primal-dual",
+    "density": 1.0,
+    "graph_signature": "cbc2b9169ebfae17",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 99.29682953605757,
+    "observed_weight_min": 2.143956691032704,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        5,
+        13,
+        26,
+        35,
+        49,
+        59
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 0,
+        "runtime_ms": 0.025622
+      },
+      "total_weight": 54.39242832043647
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "blossom-engine",
+    "density": 1.0,
+    "graph_signature": "cbc2b9169ebfae17",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 99.29682953605757,
+    "observed_weight_min": 2.143956691032704,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        5,
+        13,
+        26,
+        35,
+        49,
+        59
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 2,
+        "blossoms_expanded": 0,
+        "dual_updates": 12,
+        "iterations": 600,
+        "runtime_ms": 0.046513
+      },
+      "total_weight": 54.39242832043647
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "sparse-blossom",
+    "density": 1.0,
+    "graph_signature": "cbc2b9169ebfae17",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 99.29682953605757,
+    "observed_weight_min": 2.143956691032704,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        5,
+        13,
+        26,
+        35,
+        49,
+        59
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 6,
+        "blossoms_created": 2,
+        "blossoms_expanded": 0,
+        "dual_updates": 12,
+        "iterations": 50,
+        "runtime_ms": 0.052445
+      },
+      "total_weight": 54.39242832043647
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "duan-scaling",
+    "density": 1.0,
+    "graph_signature": "cbc2b9169ebfae17",
+    "m": 66,
+    "n": 12,
+    "observed_weight_max": 99.29682953605757,
+    "observed_weight_min": 2.143956691032704,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        5,
+        13,
+        26,
+        35,
+        49,
+        59
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 305,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 249,
+        "iterations": 61,
+        "runtime_ms": 2.521378
+      },
+      "total_weight": 54.39242832043647
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "fast-blossom",
+    "density": 0.5,
+    "graph_signature": "e51781f16eab18be",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.30729158986837,
+    "observed_weight_min": 1.3688991463771782,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        1,
+        0,
+        3,
+        9,
+        18,
+        8,
+        39,
+        15,
+        37,
+        64
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 1,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 10,
+        "runtime_ms": 0.011793999999999999
+      },
+      "total_weight": 290.6815540346967
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-heuristic",
+    "density": 0.5,
+    "graph_signature": "e51781f16eab18be",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.30729158986837,
+    "observed_weight_min": 1.3688991463771782,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        1,
+        0,
+        3,
+        9,
+        18,
+        8,
+        39,
+        15,
+        37,
+        64
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.017757
+      },
+      "total_weight": 290.6815540346967
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-weighted-approach",
+    "density": 0.5,
+    "graph_signature": "e51781f16eab18be",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.30729158986837,
+    "observed_weight_min": 1.3688991463771782,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        1,
+        66,
+        4,
+        9,
+        59,
+        40,
+        50,
+        39,
+        76,
+        51
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.269737
+      },
+      "total_weight": 467.02818710771817
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "mehlhorn-nobahari",
+    "density": 0.5,
+    "graph_signature": "e51781f16eab18be",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.30729158986837,
+    "observed_weight_min": 1.3688991463771782,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        1,
+        66,
+        4,
+        9,
+        59,
+        40,
+        50,
+        39,
+        76,
+        51
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.227934
+      },
+      "total_weight": 467.02818710771817
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "primal-dual",
+    "density": 0.5,
+    "graph_signature": "e51781f16eab18be",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.30729158986837,
+    "observed_weight_min": 1.3688991463771782,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        0,
+        1,
+        2,
+        9,
+        20,
+        39,
+        40,
+        59,
+        75,
+        88
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 0,
+        "runtime_ms": 0.08937099999999999
+      },
+      "total_weight": 144.10153777376436
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "blossom-engine",
+    "density": 0.5,
+    "graph_signature": "e51781f16eab18be",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.30729158986837,
+    "observed_weight_min": 1.3688991463771782,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        0,
+        1,
+        2,
+        9,
+        20,
+        39,
+        40,
+        59,
+        75,
+        88
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 14,
+        "iterations": 2103,
+        "runtime_ms": 0.069551
+      },
+      "total_weight": 144.10153777376436
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "sparse-blossom",
+    "density": 0.5,
+    "graph_signature": "e51781f16eab18be",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.30729158986837,
+    "observed_weight_min": 1.3688991463771782,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        0,
+        1,
+        2,
+        9,
+        20,
+        39,
+        40,
+        59,
+        75,
+        88
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 14,
+        "iterations": 106,
+        "runtime_ms": 0.079306
+      },
+      "total_weight": 144.10153777376436
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "duan-scaling",
+    "density": 0.5,
+    "graph_signature": "e51781f16eab18be",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.30729158986837,
+    "observed_weight_min": 1.3688991463771782,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        0,
+        1,
+        2,
+        9,
+        20,
+        39,
+        40,
+        59,
+        75,
+        88
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 618,
+        "blossoms_created": 4,
+        "blossoms_expanded": 0,
+        "dual_updates": 310,
+        "iterations": 62,
+        "runtime_ms": 3.820166
+      },
+      "total_weight": 144.10153777376436
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "fast-blossom",
+    "density": 0.5,
+    "graph_signature": "e72351f48fb67f2b",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.99258999197492,
+    "observed_weight_min": 1.7791042263917727,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        13,
+        1,
+        2,
+        23,
+        6,
+        5,
+        12,
+        74,
+        11
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 1,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 10,
+        "runtime_ms": 0.012215
+      },
+      "total_weight": 499.5371516178258
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-heuristic",
+    "density": 0.5,
+    "graph_signature": "e72351f48fb67f2b",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.99258999197492,
+    "observed_weight_min": 1.7791042263917727,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        13,
+        1,
+        2,
+        23,
+        6,
+        5,
+        12,
+        74,
+        11
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.017796
+      },
+      "total_weight": 499.5371516178258
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-weighted-approach",
+    "density": 0.5,
+    "graph_signature": "e72351f48fb67f2b",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.99258999197492,
+    "observed_weight_min": 1.7791042263917727,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        71,
+        13,
+        21,
+        8,
+        5,
+        57,
+        10,
+        9,
+        69,
+        30
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.177616
+      },
+      "total_weight": 468.58001650063966
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "mehlhorn-nobahari",
+    "density": 0.5,
+    "graph_signature": "e72351f48fb67f2b",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.99258999197492,
+    "observed_weight_min": 1.7791042263917727,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        71,
+        13,
+        21,
+        8,
+        5,
+        57,
+        10,
+        9,
+        69,
+        30
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.138789
+      },
+      "total_weight": 468.58001650063966
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "primal-dual",
+    "density": 0.5,
+    "graph_signature": "e72351f48fb67f2b",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.99258999197492,
+    "observed_weight_min": 1.7791042263917727,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        10,
+        11,
+        16,
+        19,
+        21,
+        47,
+        50,
+        61,
+        72,
+        81
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 0,
+        "runtime_ms": 0.046265
+      },
+      "total_weight": 122.47375668288379
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "blossom-engine",
+    "density": 0.5,
+    "graph_signature": "e72351f48fb67f2b",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.99258999197492,
+    "observed_weight_min": 1.7791042263917727,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        10,
+        11,
+        16,
+        19,
+        21,
+        47,
+        50,
+        61,
+        72,
+        81
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 12,
+        "iterations": 2130,
+        "runtime_ms": 0.07675
+      },
+      "total_weight": 122.47375668288379
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "sparse-blossom",
+    "density": 0.5,
+    "graph_signature": "e72351f48fb67f2b",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.99258999197492,
+    "observed_weight_min": 1.7791042263917727,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        10,
+        11,
+        16,
+        19,
+        21,
+        47,
+        50,
+        61,
+        72,
+        81
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 12,
+        "iterations": 107,
+        "runtime_ms": 0.07043
+      },
+      "total_weight": 122.47375668288379
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "duan-scaling",
+    "density": 0.5,
+    "graph_signature": "e72351f48fb67f2b",
+    "m": 95,
+    "n": 20,
+    "observed_weight_max": 99.99258999197492,
+    "observed_weight_min": 1.7791042263917727,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        10,
+        11,
+        16,
+        19,
+        21,
+        47,
+        50,
+        61,
+        72,
+        81
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 627,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 315,
+        "iterations": 63,
+        "runtime_ms": 4.009722
+      },
+      "total_weight": 122.47375668288379
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "fast-blossom",
+    "density": 1.0,
+    "graph_signature": "7f36cea64a0b3ad0",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.75143818714781,
+    "observed_weight_min": 1.9269182533788936,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        37,
+        70,
+        99,
+        124,
+        145,
+        162,
+        175,
+        184,
+        189
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 45,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 10,
+        "runtime_ms": 0.018399000000000002
+      },
+      "total_weight": 642.9552272699652
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-heuristic",
+    "density": 1.0,
+    "graph_signature": "7f36cea64a0b3ad0",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.75143818714781,
+    "observed_weight_min": 1.9269182533788936,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        37,
+        70,
+        99,
+        124,
+        145,
+        162,
+        175,
+        184,
+        189
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.020692000000000002
+      },
+      "total_weight": 642.9552272699652
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-weighted-approach",
+    "density": 1.0,
+    "graph_signature": "7f36cea64a0b3ad0",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.75143818714781,
+    "observed_weight_min": 1.9269182533788936,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        37,
+        70,
+        99,
+        124,
+        145,
+        162,
+        175,
+        184,
+        189
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.160157
+      },
+      "total_weight": 642.9552272699652
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "mehlhorn-nobahari",
+    "density": 1.0,
+    "graph_signature": "7f36cea64a0b3ad0",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.75143818714781,
+    "observed_weight_min": 1.9269182533788936,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        37,
+        70,
+        99,
+        124,
+        145,
+        162,
+        175,
+        184,
+        189
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.126215
+      },
+      "total_weight": 642.9552272699652
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "primal-dual",
+    "density": 1.0,
+    "graph_signature": "7f36cea64a0b3ad0",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.75143818714781,
+    "observed_weight_min": 1.9269182533788936,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        18,
+        30,
+        39,
+        66,
+        72,
+        102,
+        126,
+        142,
+        164,
+        178
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 0,
+        "runtime_ms": 0.061629
+      },
+      "total_weight": 78.90816919010093
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "blossom-engine",
+    "density": 1.0,
+    "graph_signature": "7f36cea64a0b3ad0",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.75143818714781,
+    "observed_weight_min": 1.9269182533788936,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        18,
+        30,
+        39,
+        66,
+        72,
+        102,
+        126,
+        142,
+        164,
+        178
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 1,
+        "blossoms_expanded": 0,
+        "dual_updates": 20,
+        "iterations": 2658,
+        "runtime_ms": 0.089072
+      },
+      "total_weight": 78.90816919010093
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "sparse-blossom",
+    "density": 1.0,
+    "graph_signature": "7f36cea64a0b3ad0",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.75143818714781,
+    "observed_weight_min": 1.9269182533788936,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        18,
+        30,
+        39,
+        66,
+        72,
+        102,
+        126,
+        142,
+        164,
+        178
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 1,
+        "blossoms_expanded": 0,
+        "dual_updates": 20,
+        "iterations": 133,
+        "runtime_ms": 0.117831
+      },
+      "total_weight": 78.90816919010093
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "duan-scaling",
+    "density": 1.0,
+    "graph_signature": "7f36cea64a0b3ad0",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.75143818714781,
+    "observed_weight_min": 1.9269182533788936,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        18,
+        30,
+        39,
+        66,
+        72,
+        102,
+        126,
+        142,
+        164,
+        178
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 616,
+        "blossoms_created": 3,
+        "blossoms_expanded": 2,
+        "dual_updates": 311,
+        "iterations": 62,
+        "runtime_ms": 3.798453
+      },
+      "total_weight": 78.90816919010093
+    },
+    "run": 1,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "fast-blossom",
+    "density": 1.0,
+    "graph_signature": "89abb2a18b6e1ee6",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.50481975385108,
+    "observed_weight_min": 1.5407741720794195,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        37,
+        70,
+        99,
+        124,
+        145,
+        162,
+        175,
+        184,
+        189
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 45,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 10,
+        "runtime_ms": 0.05707
+      },
+      "total_weight": 417.8830036509619
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-heuristic",
+    "density": 1.0,
+    "graph_signature": "89abb2a18b6e1ee6",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.50481975385108,
+    "observed_weight_min": 1.5407741720794195,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        37,
+        70,
+        99,
+        124,
+        145,
+        162,
+        175,
+        184,
+        189
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 2,
+        "runtime_ms": 0.02093
+      },
+      "total_weight": 417.8830036509619
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "gabow-weighted-approach",
+    "density": 1.0,
+    "graph_signature": "89abb2a18b6e1ee6",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.50481975385108,
+    "observed_weight_min": 1.5407741720794195,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        37,
+        70,
+        99,
+        124,
+        145,
+        162,
+        175,
+        184,
+        189
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.161433
+      },
+      "total_weight": 417.8830036509619
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "mehlhorn-nobahari",
+    "density": 1.0,
+    "graph_signature": "89abb2a18b6e1ee6",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.50481975385108,
+    "observed_weight_min": 1.5407741720794195,
+    "problem": "maximum-cardinality",
+    "result": {
+      "edges": [
+        0,
+        37,
+        70,
+        99,
+        124,
+        145,
+        162,
+        175,
+        184,
+        189
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 1,
+        "runtime_ms": 0.131536
+      },
+      "total_weight": 417.8830036509619
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "primal-dual",
+    "density": 1.0,
+    "graph_signature": "89abb2a18b6e1ee6",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.50481975385108,
+    "observed_weight_min": 1.5407741720794195,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        7,
+        32,
+        39,
+        63,
+        83,
+        99,
+        139,
+        153,
+        159,
+        165
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 0,
+        "blossoms_expanded": 0,
+        "dual_updates": 0,
+        "iterations": 0,
+        "runtime_ms": 0.063121
+      },
+      "total_weight": 59.93088488770793
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "blossom-engine",
+    "density": 1.0,
+    "graph_signature": "89abb2a18b6e1ee6",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.50481975385108,
+    "observed_weight_min": 1.5407741720794195,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        7,
+        32,
+        39,
+        63,
+        83,
+        99,
+        139,
+        153,
+        159,
+        165
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 2,
+        "blossoms_expanded": 0,
+        "dual_updates": 21,
+        "iterations": 2435,
+        "runtime_ms": 0.088132
+      },
+      "total_weight": 59.93088488770793
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "sparse-blossom",
+    "density": 1.0,
+    "graph_signature": "89abb2a18b6e1ee6",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.50481975385108,
+    "observed_weight_min": 1.5407741720794195,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        7,
+        32,
+        39,
+        63,
+        83,
+        99,
+        139,
+        153,
+        159,
+        165
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 10,
+        "blossoms_created": 2,
+        "blossoms_expanded": 0,
+        "dual_updates": 21,
+        "iterations": 122,
+        "runtime_ms": 0.160079
+      },
+      "total_weight": 59.93088488770793
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "duan-scaling",
+    "density": 1.0,
+    "graph_signature": "89abb2a18b6e1ee6",
+    "m": 190,
+    "n": 20,
+    "observed_weight_max": 98.50481975385108,
+    "observed_weight_min": 1.5407741720794195,
+    "problem": "minimum-weight-perfect",
+    "result": {
+      "edges": [
+        7,
+        32,
+        39,
+        63,
+        83,
+        99,
+        139,
+        153,
+        159,
+        165
+      ],
+      "is_perfect": true,
+      "metadata": {
+        "augmentations": 662,
+        "blossoms_created": 7,
+        "blossoms_expanded": 4,
+        "dual_updates": 323,
+        "iterations": 62,
+        "runtime_ms": 4.532786
+      },
+      "total_weight": 59.93088488770793
+    },
+    "run": 2,
+    "seed": 6840227782638523137,
+    "weight_range": [
+      1.0,
+      100.0
+    ]
+  }
+]

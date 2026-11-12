@@ -20,7 +20,8 @@ blossom-study/
 │       ├── hopcroft_karp.rs # Bipartite maximum-cardinality solver
 │       ├── hungarian.rs    # Bipartite assignment primal-dual solver
 │       ├── blossom_engine.rs # Independent weighted blossom solver
-│       ├── mwpm.rs         # Active weighted primal-dual solver adapter
+│       ├── mwpm.rs         # Dense-matrix weighted primal-dual baseline adapter
+│       ├── duan_mwpm.rs    # Adapter for the imported scaling solver
 │       ├── sparse_mwpm.rs  # Sparse event-driven experiment
 │       └── korte_vygen.rs  # Reference-only implementation
 ├── tests/
@@ -33,7 +34,10 @@ blossom-study/
 │   ├── matching.rs         # Integration and cross-implementation tests
 │   └── data/               # Test graph fixtures
 ├── bench/
-│   └── main.rs             # Benchmark runner
+│   ├── main.rs             # Quick comparison runner
+│   └── records/            # Saved reproducible smoke-run inputs and outputs
+├── benches/
+│   └── matching.rs         # Criterion benchmark groups
 ├── implementations/         # Focused source crates for imported algorithms
 │   ├── dsu/                # Shared union-find implementation
 │   ├── duan_mwpm/          # Scaling-based weighted solver
@@ -46,14 +50,14 @@ blossom-study/
 ## Current Status
 
 ### Working Features
-- 🧪 **Gabow-inspired cardinality** (`gabow`): phased alternating search with blossom contraction and an Edmonds-style single-path search when a phase stalls. It does **not** construct the paper's tight-edge auxiliary graph $H$ or establish its $O(m\sqrt n)$ bound. An eight-vertex false-optimum regression is retained.
+- 🧪 **Gabow-inspired cardinality** (`gabow`): phased alternating search with blossom contraction and an Edmonds-style single-path search when a phase stalls. It does **not** construct the paper's tight-edge auxiliary graph $H$ or establish its $O(m\sqrt n)$ bound. Regressions cover the eight-vertex false optimum and a path-tracing cycle after a batch augmentation.
 - ⚠️ **Experimental Micali–Vazirani research track** (`micali-vazirani`): parity levels, bridge tenacity, DDFS proposals, and petal unrolling. Nested-petal discovery and the complete algorithm have not been independently established as complete. Recursive path and petal certificates share a fixed 100,000-state safety budget; exceeding it returns an error rather than risking an unbounded search or claiming a maximum. This is not a dependable general-purpose solver and the published MV time bound does **not** apply.
 - ✅ **Conventional Blossom Cardinality** (`fast-blossom`): Edmonds blossom contraction with timestamp-based LCA and DSU.
 - ✅ **Shared DSU**: fast blossom, the Gabow tracks, the MV petal search, and the retained Korte–Vygen reference use `implementations/dsu/`. Directed contraction keeps the requested blossom base; ordinary union reports its chosen root.
 - ✅ **Gabow-family cardinality implementations**: `gabow-weighted-approach` builds a tight-edge auxiliary graph from an Edmonds search; `mehlhorn-nobahari` uses the revised shortest-path search. Their source is kept in separate, small modules under `implementations/`.
 - ✅ **Hopcroft–Karp Bipartite Matching** (`hopcroft-karp`): $O(m \sqrt{n})$ multi-phase bipartite maximum cardinality matching.
 - ✅ **General-graph Minimum-Weight Perfect Matching**:
-  - `primal-dual`: Standard dense-matrix primal-dual baseline with exact `i128` dual arithmetic.
+  - `primal-dual`: Dense `n × n` weight-matrix adapter around `integer-blossom`, with exact `i128` cost scaling and transformed weights. Matrix construction and solver execution are both inside its reported runtime.
   - `blossom-engine`: Independent Galil/Edmonds primal-dual solver with explicit alternating forests and nested blossoms.
   - `sparse-blossom`: Sparse event-driven adjacency/map implementation.
   - `duan-scaling`: integer-weight scaling implementation of Duan–Pettie–Su's Liquidationist framework. It uses simpler search/event routines than the paper, so its published runtime bound does not apply.
@@ -63,7 +67,7 @@ blossom-study/
 
 ### Performance interpretation
 
-Use the benchmark commands below for measurements on your machine. The generic runner excludes experimental Micali–Vazirani. Criterion includes a separately named MV level-search-only development group, which is not an end-to-end solver benchmark. No MV timing constitutes a comparison with the published algorithm or evidence for its asymptotic bound. Check matching correctness before comparing times.
+Use the benchmark commands below for measurements on your machine. The generic runner excludes experimental Micali–Vazirani. Criterion includes a separately named MV level-search-only development group, which is not an end-to-end solver benchmark. No MV timing constitutes a comparison with the published algorithm or evidence for its asymptotic bound. See [benchmark records](bench/records/README.md) for a saved, seeded smoke run and its measurement limits.
 
 Run the independent exact-oracle comparisons with:
 
@@ -149,6 +153,14 @@ requested and observed weight bounds, and a graph signature. Density is a
 fraction in `[0, 1]`, and ranges use inclusive lower and exclusive upper
 bounds.
 
+The quick `--bin bench` runner creates random weighted complete and sparse
+graphs without a recorded seed; its printed timings are exploratory. For a
+repeatable input record, use the configurable CLI runner with a saved config.
+Its JSON captures the seed, graph signature and each solver's internal runtime.
+Those are single-call timings, not Criterion estimates. The committed
+[smoke record](bench/records/2026-11-12-smoke/) documents the exact command,
+toolchain and graph identities; do not use its small timings to rank solvers.
+
 ### Interpreting solver counters
 
 `MatchingMetadata` uses one shared output shape, not shared counter semantics.
@@ -163,12 +175,14 @@ measurement; use Criterion's reported measurements for benchmark comparisons.
 |---|---|---|---|
 | `fast-blossom` | Alternating-forest queue vertices processed | Successful augmenting paths | `blossoms_created` counts contraction events; expansion and dual-update counters are uninstrumented |
 | `gabow-heuristic` | Outer heuristic search phases | Paths augmented, including fallback single-path augmentations | Blossom contractions counted; expansion and dual-update counters are uninstrumented |
+| `gabow-weighted-approach`, `mehlhorn-nobahari` | Number of phases returned by the imported crate | Reported matching cardinality, not an internal augmentation counter | Blossom and dual-update counters are not exposed by the adapters |
 | `micali-vazirani` | Solver phases | Paths augmented | Petals/blossoms created counted; expansion and dual-update counters are uninstrumented. The Criterion development group measures only level search and has no end-to-end solver counter comparison |
 | `hopcroft-karp` | Adjacency entries examined by BFS and DFS | Successful shortest augmenting paths | Blossom and dual-update counters are not applicable |
 | Hungarian | Candidate row/column entries examined by the assignment search | Rows inserted into the assignment, one augmentation attempt per left vertex | `dual_updates` counts potential-adjustment steps; blossom counters are not applicable |
 | `primal-dual` | Not instrumented (`0`) | Reported perfect-matching cardinality, `n / 2`, not an internal counter | Blossom and dual-update counters are not exposed by the wrapped dependency |
 | `blossom-engine` | Edge scans | Successful augmentations | Blossom creations/expansions and dual adjustments are counted by the implementation |
 | `sparse-blossom` | Search-queue entries processed | Reported perfect-matching cardinality, `n / 2`, not an internal counter | Blossom creations/expansions and dual adjustments are counted; its augmentation counter is inferred |
+| `duan-scaling` | Number of scaling stages | Internal augmentation count reported by the imported crate | Contractions, dissolutions, and dual events are reported by the imported crate; they are not directly comparable with the other weighted counters |
 
 ---
 
@@ -191,7 +205,7 @@ measurement; use Criterion's reported measurements for benchmark comparisons.
 
 These are in-repository weighted matching studies with distinct state representations. Their measured behavior should be compared on the same graph families; a common framework does not imply identical complexity or robustness.
 
-- **`primal-dual` — weighted baseline.** Uses edge-list Edmonds/Galil alternating forests, integer-scaled costs and exact `i128` dual updates. Background: [Galil (1986)](https://doi.org/10.1145/6462.6502).
+- **`primal-dual` — weighted baseline.** Filters the graph's edges, converts finite `f64` costs to exact scaled `i128` values when representable, then builds a dense symmetric matrix with a cardinality-dominating bonus for `integer-blossom::max_weight_matching`. It returns an error if scaling or the bonus overflows `i128`. The repository adapter does not expose the dependency's blossom or dual counters. Background: [Galil (1986)](https://doi.org/10.1145/6462.6502).
 - **`blossom-engine` — independent weighted state machine.** Makes blossom creation, dual adjustments and path lifting explicit for study; it solves the same weighted matching problem through a separate implementation. Background: [Edmonds (1965)](https://doi.org/10.1145/321250.321261); [Galil (1986)](https://doi.org/10.1145/6462.6502).
 - **`sparse-blossom` — event-driven sparse experiment.** Uses incident-edge maps rather than a dense weight matrix, while retaining weighted blossom/dual operations. Its amortized bound is not proved here. Background: [Kolmogorov's Blossom V paper (2009)](https://pub.ista.ac.at/~vnk/papers/blossom5.pdf) for a contrasting mature weighted implementation.
 - **`duan-scaling` — Liquidationist integer scaling study.** Carries duals and inherited blossoms across bits, liquidates blossoms, and uses SearchOne before final perfection. The source preserves its BSD notice and implementation notes in `implementations/duan_mwpm/`. It omits the specialized data structures needed for the paper's $O(m\sqrt n\log(nN))$ bound. The adapter preserves exact costs only if a common binary scaling fits signed 64-bit integers; otherwise it reports an error. Literature: [Duan, Pettie, and Su (2017)](https://arxiv.org/abs/1411.1919).

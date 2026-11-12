@@ -1,0 +1,17 @@
+{
+  "seed": 6840227782638523137,
+  "graph_sizes": [12, 20],
+  "densities": [0.5, 1.0],
+  "weight_ranges": [[1.0, 100.0]],
+  "runs_per_config": 2,
+  "algorithms": [
+    "fast_blossom",
+    "gabow-heuristic",
+    "gabow-weighted-approach",
+    "mehlhorn-nobahari",
+    "primal-dual",
+    "blossom-engine",
+    "sparse-blossom",
+    "duan-scaling"
+  ]
+}
