@@ -20,12 +20,14 @@
 //!   parent pointers in the original graph G (not in H), greedily skipping
 //!   paths that overlap already-committed vertices. When the phased search
 //!   stalls or misses paths hidden inside nested blossoms, a single-path
-//!   Edmonds fallback search guarantees correctness.
+//!   Edmonds-style fallback searches for another augmenting path.
 //!
-//! The result is a **correct maximum-cardinality matcher** (verified against
-//! exhaustive brute-force oracles), but without the O(m√n) worst-case bound.
-//! It is best described as a heuristic that happens to be very fast in
-//! practice, particularly on dense graphs.
+//! If the fallback always finds an augmenting path when one exists, stopping
+//! when it fails would certify maximum cardinality by Berge's theorem. That
+//! completeness property has not been proved for this implementation. It
+//! passes exhaustive small-graph and seeded differential tests, but those
+//! finite tests are evidence rather than a correctness guarantee. The
+//! heuristic search also has no established O(m√n) worst-case bound.
 //!
 //! # Algorithmic Architecture
 //!
@@ -62,11 +64,11 @@ pub use blossom_dsu::UnionFind as Dsu;
 
 /// Heuristic phased cardinality solver inspired by Gabow's algorithm.
 ///
-/// Produces a correct maximum-cardinality matching (verified against
-/// brute-force oracles), but does not construct Gabow's auxiliary graph H
-/// and therefore lacks the O(m√n) worst-case guarantee. The single-path
-/// Edmonds fallback ensures correctness when the greedy phased search
-/// misses paths hidden in nested blossoms.
+/// Aims to produce a maximum-cardinality matching, with finite exhaustive
+/// and differential test coverage. The fallback searches for paths missed by
+/// the greedy phase, but its completeness has not been formally established
+/// here. This is not Gabow's auxiliary-graph-H algorithm and carries no
+/// O(m√n) worst-case guarantee.
 #[derive(Clone, Debug)]
 pub struct GabowHeuristic {
     n: usize,
@@ -154,7 +156,8 @@ impl GabowHeuristic {
             let Some(target_len) = shortest_len_opt else {
                 // The phased search is not a complete optimality certificate.
                 // In particular, nested blossoms can hide an augmenting path
-                // even when no candidate bridge was reported.
+                // even when no candidate bridge was reported. The fallback
+                // attempts a separate search; its completeness is unproved.
                 let single = self.augment_single_path(graph);
                 if single == 0 {
                     break;

@@ -23,7 +23,8 @@ a maximum matching. It remains outside end-to-end benchmark comparisons.
 
 The Gabow-inspired heuristic is distinct from the two imported Gabow-family
 implementations. Its fallback can find paths missed by its phased search, but
-its phase structure does not establish the paper's time bound. The imported
+the fallback's completeness has not been proved for this code. Its phase
+structure also does not establish the paper's time bound. The imported
 `gabow-weighted-approach` and `mehlhorn-nobahari` solvers are separate entries
 in the general-cardinality comparison registry.
 

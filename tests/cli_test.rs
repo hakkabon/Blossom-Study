@@ -28,7 +28,12 @@ fn documented_cli_workflow_succeeds() {
     );
     assert!(String::from_utf8_lossy(&cardinality.stdout).contains("is_perfect=true"));
 
-    for solver in ["gabow-weighted-approach", "mehlhorn-nobahari"] {
+    for solver in [
+        "gabow-heuristic",
+        "gabow", // legacy CLI alias
+        "gabow-weighted-approach",
+        "mehlhorn-nobahari",
+    ] {
         let output = run(&["--algorithm", solver, "max-cardinality", "-i", graph_path]);
         assert!(
             output.status.success(),

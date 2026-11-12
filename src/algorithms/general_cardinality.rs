@@ -21,8 +21,10 @@ pub struct GeneralCardinalitySolver {
 
 /// Solvers admitted to end-to-end general-cardinality comparisons.
 ///
-/// Experimental Micali–Vazirani is deliberately excluded: its completeness is
-/// unestablished. Bipartite Hopcroft–Karp is benchmarked in its own category.
+/// Experimental Micali–Vazirani is excluded because it can return an
+/// uncertified-result error. Inclusion of the Gabow-inspired heuristic means
+/// it participates in checked comparisons, not that its completeness is
+/// proved. Bipartite Hopcroft–Karp has its own category.
 pub const GENERAL_CARDINALITY_SOLVERS: &[GeneralCardinalitySolver] = &[
     GeneralCardinalitySolver {
         name: "fast-blossom",
@@ -31,7 +33,7 @@ pub const GENERAL_CARDINALITY_SOLVERS: &[GeneralCardinalitySolver] = &[
     },
     GeneralCardinalitySolver {
         name: "gabow-heuristic",
-        role: "Gabow-inspired heuristic; no O(m sqrt(n)) guarantee",
+        role: "Gabow-inspired heuristic; completeness and time bound unproved",
         solve: algorithms::gabow_heuristic_matching,
     },
     GeneralCardinalitySolver {

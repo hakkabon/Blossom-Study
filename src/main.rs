@@ -12,7 +12,8 @@ pub enum Algorithm {
     FastBlossom,
     /// Experimental Micali–Vazirani track (may reject uncertified results)
     MicaliVazirani,
-    /// Gabow-inspired heuristic phased cardinality solver (correct but no O(m√n) guarantee)
+    /// Gabow-inspired heuristic; completeness and time bound are unproved
+    #[value(name = "gabow-heuristic", alias = "gabow")]
     Gabow,
     /// Gabow's 2017 weighted matching approach to cardinality
     GabowWeightedApproach,
@@ -562,7 +563,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
         "Commands: load <file>, max, min, graph, edges, result, save <file>, algo <name>, quit"
     );
     println!(
-        "Cardinality algorithms: fast_blossom, gabow, gabow_weighted_approach, mehlhorn_nobahari, micali_vazirani (experimental)"
+        "Cardinality algorithms: fast_blossom, gabow-heuristic (alias: gabow), gabow_weighted_approach, mehlhorn_nobahari, micali_vazirani (experimental)"
     );
     println!("File formats: JSON (.json), DIMACS (.dimacs, .dat, .txt)");
     println!();
@@ -586,7 +587,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                     "algo" | "algorithm" => {
                         if parts.len() < 2 {
                             println!(
-                                "Usage: algo <fast_blossom|gabow|gabow_weighted_approach|mehlhorn_nobahari|micali_vazirani>"
+                                "Usage: algo <fast_blossom|gabow-heuristic|gabow_weighted_approach|mehlhorn_nobahari|micali_vazirani>"
                             );
                             println!("Current: {:?}", current_algorithm);
                             continue;
@@ -605,7 +606,7 @@ fn run_repl(initial_load: Option<String>, initial_algorithm: Algorithm) -> Resul
                             }
                             _ => {
                                 println!(
-                                    "Unknown algorithm: {}. Use 'fast_blossom', 'gabow', 'gabow_weighted_approach', 'mehlhorn_nobahari', or 'micali_vazirani'",
+                                    "Unknown algorithm: {}. Use 'fast_blossom', 'gabow-heuristic', 'gabow_weighted_approach', 'mehlhorn_nobahari', or 'micali_vazirani'",
                                     parts[1]
                                 );
                                 continue;
